@@ -125,7 +125,7 @@ namespace GroteOpdracht
             ldm = float.Parse(parts[5]);
             matrixID = int.Parse(parts[6]);
             xcoord = int.Parse(parts[7]);
-            ycoord = int.Parse(parts[8]);
+            ycoord = int.Parse(parts[8]);// hell
         }
     }
     public class MatrixVak
