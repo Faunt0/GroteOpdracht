@@ -23,7 +23,7 @@ namespace GroteOpdracht
                     list.AddFirst(new Bedrijf(parts));
                 }
             }
-            Console.WriteLine(list.First.Value.plaats);
+            Console.WriteLine(list.First.Value.order);
 
             // get the distance matrix
             int len = 0;
@@ -48,34 +48,73 @@ namespace GroteOpdracht
             Console.WriteLine(matrix[0,1].afstand);
         }
 
-        static Route ILS()
+        static Oplossing ILS()
         {
-            Route route = new Route();
-            return route;
+            Oplossing oplossing = new Oplossing();
+            return oplossing;
         }
         static void Operation()
         {
+            // check de buurruimte dmv add and remove
+            // je kan werken met een enkele truck die twee keer zo lang mag rijden,
+            // 200.000L capaciteit <- is dat nog hetzelfde dan?
 
         }
-    }
+        static float kosten(Route r)
+        {
+            return 0;
+        }
+        static bool isValidRoute(Route r, MatrixVak[,] matrix)
+        {
+            // is de rijtijd + leegtijd binnen een dag
+            // eindigt de route bij id 287
 
+            float tijdspanne = 0; // minuten
+            float truckvolume = 0;
+            LinkedListNode<Bedrijf> node = r.route.First;
+            while (node.Next != null)
+            {
+                if (node.Value.matrixID == 287)
+                {
+                    // leeg een truck binnen 30 minuten
+                    tijdspanne += 30;
+                    truckvolume = 0;
+                } else
+                {
+                    tijdspanne += matrix[node.Value.matrixID, node.Next.Value.matrixID].rijtijd + node.Value.ldm;
+                    truckvolume += node.Value.cont * node.Value.vpc;
+                }
+            }
+            if (tijdspanne > 11.50 * 2 * 60) { return false; }
+            if (r.route.Last.Value.matrixID != 287) { return false; }
+            if (truckvolume > 200000) { return false; }
+            return true;
+        }
+    }
+    public class Oplossing
+    {
+        public Route[] routelijst;
+        public Oplossing()
+        {
+            routelijst = new Route[5]; // maak een lijst van routes die corresponderen met de dagen
+        }
+    }
     public class Route
     {
-        public LinkedList<Bedrijf> routes;
+        public LinkedList<Bedrijf> route;
         public Route() { }
-
     }
     public class Bedrijf
     {
-        public int order;
-        public string plaats;
+        public int order; // niet nodig toch?
+        public string plaats; // niet nodig
         public string freq;
         public int cont;
         public int vpc;
         public float ldm;
         public int matrixID;
-        public int xcoord; 
-        public int ycoord;
+        public int xcoord; // niet nodig
+        public int ycoord; // niet nodig
         public Bedrijf(string[] parts)
         {
             order = int.Parse(parts[0]);
