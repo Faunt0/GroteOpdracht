@@ -30,7 +30,6 @@ namespace GroteOpdracht
                     }
                 }
             }
-            Console.WriteLine(grabbelton[0]);
 
             
             //Dictionary<(int, int), (int, float)> fileDict = new Dictionary<(int, int), (int, float)>();
@@ -55,14 +54,19 @@ namespace GroteOpdracht
             Oplossing oplossing = new Oplossing(fileDict);
             oplossing.grabbelton = grabbelton;
             oplossing.beginScore(grabbelton, fileDict);
-            Console.WriteLine(oplossing.score);
+            Console.WriteLine($"score eerst: {oplossing.score}");
 
             DateTime before = DateTime.Now;
             oplossing.ILS();
             DateTime after = DateTime.Now;
-            TimeSpan ts = before - after;
-            Console.WriteLine(ts.Milliseconds);
-            Console.WriteLine(oplossing.routelijst.ToString());
+            TimeSpan ts = after - before;
+
+            Console.WriteLine($"score daarna: {oplossing.score}");
+            Console.WriteLine($"Milliseconden:\t{ts.TotalMilliseconds}");
+            Console.WriteLine($"Iteraties:\t{oplossing.tellertje}");
+            float speed = oplossing.tellertje / ((float)ts.TotalMilliseconds / 1000);
+            Console.WriteLine($"speed:\t\t{speed} iterations/s");
+            Console.WriteLine($"T waarde:\t{oplossing.T}");
         }
 
     }
@@ -74,11 +78,14 @@ namespace GroteOpdracht
         public int tellertje;
         public float score;
         public float delta;
-        public float T = 0;
+        public float T = 500;
+        public int Q = 16;
+        public float alpha;
         public Oplossing(Dictionary<(int, int), float> dictInput)
         {
             routelijst = [new Route(), new Route(), new Route(), new Route(), new Route()]; // maak een lijst van routes die corresponderen met de dagen
             distDict = dictInput;
+            alpha = 0.95F;
         }
 
         public void beginScore(List<Bedrijf> grabbelton, Dictionary<(int, int), float> distDict)
@@ -109,8 +116,8 @@ namespace GroteOpdracht
         {
             // eerst alleen de 1pwk, daarna de andere toevoegen
             // simulated annealing
-            int maxIteraties = 100;
-            while (tellertje < maxIteraties || T > 0.02)
+            int maxIteraties = 1000000;
+            while (tellertje < maxIteraties || Math.Exp(-delta / T) > 2)
             {
                 // doe iteraties
 
@@ -118,26 +125,91 @@ namespace GroteOpdracht
                 int key = rnd.Next(0, 5);
                 Route r = routelijst[key];
                 float oldscore = score;
-
-                Route newRoute = addOperation(r, grabbelton);
+                Route newRoute;
+                if (rnd.Next(2) == 1 && r.route.Count > 2)
+                {
+                    newRoute = swapWithinDay(r);
+                } else
+                {
+                    newRoute = addOperation(r);
+                }
 
                 if (oldscore <= score)
                 {
                     routelijst[key] = newRoute;
+                    tellertje++;
                 }
                 else if (rnd.Next(0, 100) < Math.Exp(-delta / T))
                 {
                     routelijst[key] = newRoute;
+                    tellertje++;
                 }
 
-                tellertje++;
+                if (tellertje % Q == 0)
+                {
+                    T = T * alpha;
+                }
+
             }
         }
-        static void swapOperation()
+        Route swapBetweenDays(Route r)
         {
-
+            return r;
         }
-        Route addOperation(Route r, List<Bedrijf> grabbelton)
+        Route swapWithinDay(Route r)
+        {
+            Random rnd = new Random();
+            Bedrijf ene = r.route[rnd.Next(r.route.Count)];
+            r.route.Remove(ene);
+            Bedrijf andere = r.route[rnd.Next(r.route.Count)];
+            r.route.Remove(andere);
+
+            float kostenVoorSwap = rijtijdKosten(ene) + rijtijdKosten(andere);
+
+            Bedrijf eneSuc = ene.successor;
+            Bedrijf enePred = ene.predecessor;
+            
+            // verwissel de predecessors en successors
+            ene.predecessor = andere.predecessor;
+            ene.successor = andere.successor;
+            andere.predecessor = enePred;
+            andere.successor = eneSuc;
+            
+
+            // bereken increment
+            float kostenNaSwap = rijtijdKosten(ene) + rijtijdKosten(andere);
+
+            delta = Math.Abs(kostenNaSwap - kostenVoorSwap);
+
+            r.route.Add(ene);
+            r.route.Add(andere);
+            return r;
+        }
+        float rijtijdKosten(Bedrijf b)
+        {
+            float naar;
+            if (b.predecessor != null) // kan in 1 regel
+            { 
+                naar = distDict[(b.predecessor.matrixID, b.matrixID)];
+            } else
+            {
+                naar = distDict[(287, b.matrixID)]; // gebruik de stort als predecessor als die er niet is
+            }
+
+            float van;
+            if (b.successor != null) // kan in 1 regel
+            {
+                van = distDict[(b.matrixID, b.successor.matrixID)];
+            }
+            else
+            {
+                van = distDict[(b.matrixID, 287)]; // gebruik de stort als successor als die er niet is
+            }
+
+            float kosten = van + naar;
+            return kosten;
+        }
+        Route addOperation(Route r)
         {
             Random rnd = new Random();
             int key = rnd.Next(0, grabbelton.Count);
@@ -147,13 +219,12 @@ namespace GroteOpdracht
                 r.route.Add(b);
                 return r;
             }
-            Bedrijf predecessor = r.route[rnd.Next(0, r.route.Count)];
+            Bedrijf predecessor = r.route[rnd.Next(0, r.route.Count)]; // grab a random element from the route as the predecessor
+            predecessor.successor = b;
+            predecessor.successor.predecessor = b;
             b.predecessor = predecessor;
             b.successor = predecessor.successor;
-            predecessor.successor.predecessor = b;
-            predecessor.successor = b;
 
-            grabbelton.ElementAt(key);
             if (!isValidRoute(r, b))
             {
                 return r;
@@ -162,12 +233,12 @@ namespace GroteOpdracht
             r.route.Add(b);
             grabbelton.Remove(b);
 
-            score += increment(b); // pas de score aan obv de aanpassing
+            score += incAddOp(b); // pas de score aan obv de aanpassing
 
             return r;
         }
-        // dit is de increment voor de add functie
-        float increment(Bedrijf b)
+        // dit is de incAddOp voor de add functie, kan dit niet beter bij de operation functie zelf?
+        float incAddOp(Bedrijf b)
         {
             // hangt af van de operation
             // als je een bedrijf toevoegd aan de route:
@@ -175,6 +246,7 @@ namespace GroteOpdracht
             float rtNaar = distDict[(b.predecessor.matrixID, b.matrixID)];
             float rtVan = distDict[(b.matrixID, b.successor.matrixID)];
             float inc = -(b.ldm * 3) + rtVan + rtNaar;
+            delta = Math.Abs(inc); // werkt nog niet goed
             return inc;
         }
         bool isValidRoute(Route r, Bedrijf b)
