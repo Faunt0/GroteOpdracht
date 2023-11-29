@@ -50,8 +50,9 @@ namespace GroteOpdracht
                 }
             }
             Console.WriteLine(fileDict[(0,1)]);
-
-            Oplossing oplossing = new Oplossing(fileDict);
+            
+            Random rndin = new Random(1);
+            Oplossing oplossing = new Oplossing(fileDict, rndin);
             oplossing.grabbelton = grabbelton;
             oplossing.beginScore(grabbelton, fileDict);
             Console.WriteLine($"score eerst: {oplossing.score}");
@@ -73,7 +74,7 @@ namespace GroteOpdracht
     public class Oplossing
     {
         public Dictionary<(int, int), float> distDict;
-        public Route[] routelijst;
+        public Route[][] trucksEnRoutes;
         public List<Bedrijf> grabbelton;
         public int tellertje;
         public float score;
@@ -81,11 +82,15 @@ namespace GroteOpdracht
         public float T = 500;
         public int Q = 16;
         public float alpha;
-        public Oplossing(Dictionary<(int, int), float> dictInput)
+        public Random rnd;
+        public Oplossing(Dictionary<(int, int), float> dictInput, Random rndIn)
         {
-            routelijst = [new Route(), new Route(), new Route(), new Route(), new Route()]; // maak een lijst van routes die corresponderen met de dagen
+            // maak een lijst van routes voor elke dag voor elke truck, ds 10 routes in totaal
+            //trucksEnRoutes = new Route[2, 5];
+            trucksEnRoutes = [[new Route(), new Route(), new Route(), new Route(), new Route()], [new Route(), new Route(), new Route(), new Route(), new Route()]];
             distDict = dictInput;
             alpha = 0.95F;
+            rnd = rndIn;
         }
 
         public void beginScore(List<Bedrijf> grabbelton, Dictionary<(int, int), float> distDict)
@@ -96,34 +101,47 @@ namespace GroteOpdracht
             {
                 grabbeltonKosten += b.ldm * 3;
             }
-            for (int i = 0; i < 5; i++)
+            for (int truck = 0; truck < 2; truck++)
             {
-                // calculate the score of each route in the beginning
-
-                Route r = routelijst[i];
-                for (int j = 0; j < r.route.Count; j++)
+                for (int i = 0; i < 5; i++)
                 {
-                    if (r.route[j].predecessor != null)
+                    // calculate the score of each route in the beginning
+
+                    Route r = trucksEnRoutes[truck][i];
+                    foreach (Bedrijf b in r.route.Values)
                     {
-                        routekosten += distDict[(r.route[j].predecessor.matrixID, r.route[j].matrixID)];
+                        if (b.predecessor == null)
+                        {
+                            routekosten += recurseRoute(b); 
+                            break;
+                        }
                     }
+
                 }
             }
             score = routekosten + grabbeltonKosten;
+        }
+        public float recurseRoute(Bedrijf b)
+        {
+            if (b.successor == null)
+            {
+                return 0;
+            }
+            return rijtijdKosten(b) + recurseRoute(b.successor);
         }
 
         public void ILS()
         {
             // eerst alleen de 1pwk, daarna de andere toevoegen
             // simulated annealing
-            int maxIteraties = 1000000;
+            int maxIteraties = 10000000;
             while (tellertje < maxIteraties || Math.Exp(-delta / T) > 2)
             {
                 // doe iteraties
+                int routekey = rnd.Next(0, 5);
+                int truckkey = rnd.Next(0, 2);
 
-                Random rnd = new Random();
-                int key = rnd.Next(0, 5);
-                Route r = routelijst[key];
+                Route r = trucksEnRoutes[truckkey][routekey];
                 float oldscore = score;
                 Route newRoute;
                 if (rnd.Next(2) == 1 && r.route.Count > 2)
@@ -133,15 +151,19 @@ namespace GroteOpdracht
                 {
                     newRoute = addOperation(r);
                 }
+                //switch (switch_on)
+                //{
+                //    default:
+                //}
 
                 if (oldscore <= score)
                 {
-                    routelijst[key] = newRoute;
+                    trucksEnRoutes[truckkey][routekey] = newRoute;
                     tellertje++;
                 }
-                else if (rnd.Next(0, 100) < Math.Exp(-delta / T))
+                else if (rnd.Next(0, 100) < Math.Exp(-delta / T) || false) // ignore this for now
                 {
-                    routelijst[key] = newRoute;
+                    trucksEnRoutes[truckkey][routekey] = newRoute;
                     tellertje++;
                 }
 
@@ -152,17 +174,29 @@ namespace GroteOpdracht
 
             }
         }
-        Route swapBetweenDays(Route r)
+        (Route, Route) swapBetweenDays()
         {
-            return r;
+            int routekey = rnd.Next(0, 5);
+            int truckkey = rnd.Next(0, 2);
+
+            Route r = trucksEnRoutes[truckkey][routekey];
+            int routekey2 = rnd.Next(0, 5);
+            int truckkey2 = rnd.Next(0, 2);
+
+            Route r2 = trucksEnRoutes[truckkey2][routekey2];
+
+            // doe dingen.
+
+            return (r, r2);
         }
         Route swapWithinDay(Route r)
         {
-            Random rnd = new Random();
-            Bedrijf ene = r.route[rnd.Next(r.route.Count)];
-            r.route.Remove(ene);
-            Bedrijf andere = r.route[rnd.Next(r.route.Count)];
-            r.route.Remove(andere);
+            Bedrijf ene = r.route.ToArray()[rnd.Next(r.route.Count)].Value;
+            int enekey = r.route.ToArray()[rnd.Next(r.route.Count)].Key;
+            r.route.Remove(enekey);
+            Bedrijf andere = r.route.ToArray()[rnd.Next(r.route.Count)].Value;
+            int anderekey = r.route.ToArray()[rnd.Next(r.route.Count)].Key;
+            r.route.Remove(anderekey);
 
             float kostenVoorSwap = rijtijdKosten(ene) + rijtijdKosten(andere);
 
@@ -181,8 +215,8 @@ namespace GroteOpdracht
 
             delta = Math.Abs(kostenNaSwap - kostenVoorSwap);
 
-            r.route.Add(ene);
-            r.route.Add(andere);
+            r.route.Add(enekey, ene);
+            r.route.Add(anderekey, andere);
             return r;
         }
         float rijtijdKosten(Bedrijf b)
@@ -194,6 +228,7 @@ namespace GroteOpdracht
             } else
             {
                 naar = distDict[(287, b.matrixID)]; // gebruik de stort als predecessor als die er niet is
+                naar = 0;
             }
 
             float van;
@@ -204,6 +239,7 @@ namespace GroteOpdracht
             else
             {
                 van = distDict[(b.matrixID, 287)]; // gebruik de stort als successor als die er niet is
+                van = 0;
             }
 
             float kosten = van + naar;
@@ -211,15 +247,14 @@ namespace GroteOpdracht
         }
         Route addOperation(Route r)
         {
-            Random rnd = new Random();
             int key = rnd.Next(0, grabbelton.Count);
             Bedrijf b = grabbelton[key]; // kan nooit voor het eerste element komen
             if (r.route.Count < 2)
             {
-                r.route.Add(b);
+                r.route.Add(r.route.Count, b);
                 return r;
             }
-            Bedrijf predecessor = r.route[rnd.Next(0, r.route.Count)]; // grab a random element from the route as the predecessor
+            Bedrijf predecessor = r.route.ToArray()[rnd.Next(r.route.Count)].Value; // grab a random element from the route as the predecessor
             predecessor.successor = b;
             predecessor.successor.predecessor = b;
             b.predecessor = predecessor;
@@ -230,25 +265,19 @@ namespace GroteOpdracht
                 return r;
             }
 
-            r.route.Add(b);
+            r.route.Add(r.route.Count, b);
             grabbelton.Remove(b);
 
-            score += incAddOp(b); // pas de score aan obv de aanpassing
+            // reken de increment uit
+            float inc = -(b.ldm * 3) + rijtijdKosten(b);
+            delta = Math.Abs(inc); // weet niet of dit de bedoeling is.
+
+            score += delta; // pas de score aan obv de aanpassing
 
             return r;
         }
-        // dit is de incAddOp voor de add functie, kan dit niet beter bij de operation functie zelf?
-        float incAddOp(Bedrijf b)
-        {
-            // hangt af van de operation
-            // als je een bedrijf toevoegd aan de route:
 
-            float rtNaar = distDict[(b.predecessor.matrixID, b.matrixID)];
-            float rtVan = distDict[(b.matrixID, b.successor.matrixID)];
-            float inc = -(b.ldm * 3) + rtVan + rtNaar;
-            delta = Math.Abs(inc); // werkt nog niet goed
-            return inc;
-        }
+        // check of de gegeven route valide is als dit bedrijf erbij komt
         bool isValidRoute(Route r, Bedrijf b)
         {
             if (b.matrixID == 287 && r.capacitiet != 0)
@@ -269,28 +298,21 @@ namespace GroteOpdracht
                 }
                 r.capacitiet += b.cont * b.vpc;
             }
-            if (r.tijdsduur > 11.50 * 2 * 60) { return false; }
-            if (r.capacitiet > 200000) { return false; }
+            if (r.tijdsduur > 11.50 * 60) { return false; }
+            if (r.capacitiet > 100000) { return false; }
             return true;
         }
     }
     public class Route
     {
-        public List<Bedrijf> route; // key is een index
+        public Dictionary<int, Bedrijf> route; // key is een index
         public float tijdsduur;
         public float capacitiet;
         // willen we een laatste elementen bijhouden.
         public Route() 
         {
-            route = new List<Bedrijf>(); // is dit nodig
+            route = new Dictionary<int, Bedrijf>(); // is dit nodig
         }
-
-        //static void removeBv(Route r, Bedrijf b)
-        //{
-        //    r.route.Remove(b); // O(1)
-        //    b.predecessor.successor = b.successor;
-        //    b.successor.predecessor = b.predecessor;
-        //}
     }
     public class Bedrijf
     {
@@ -298,7 +320,7 @@ namespace GroteOpdracht
         public Bedrijf? predecessor; // nodig voor als je een bedrijf weghaalt uit je route
         public int order; // nodig want matrixID is niet een lijst unieke nummers
         public string freq;
-        public int cont;
+        public int cont; // kan misschien beter in een ding door vpc * cont te doen als totaal volume.
         public int vpc;
         public float ldm;
         public int matrixID;
