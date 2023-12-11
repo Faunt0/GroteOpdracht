@@ -74,8 +74,9 @@ namespace GroteOpdracht
     public class Oplossing
     {
         public Dictionary<(int, int), float> distDict;
-        public Route[][] trucksEnRoutes;
-        public List<Bedrijf> grabbelton;
+        public Dag[][] trucksEnRoutes;
+        public List<Bedrijf>? grabbelton; // nullable
+        public Bedrijf stort;
         public int tellertje;
         public float score;
         public float increment;
@@ -85,9 +86,9 @@ namespace GroteOpdracht
         public Random rnd;
         public Oplossing(Dictionary<(int, int), float> dictInput, Random rndIn)
         {
-            // maak een lijst van routes voor elke dag voor elke truck, ds 10 routes in totaal
-            //trucksEnRoutes = new Route[2, 5];
-            trucksEnRoutes = [[new Route(), new Route(), new Route(), new Route(), new Route()], [new Route(), new Route(), new Route(), new Route(), new Route()]];
+
+            stort = new Bedrijf(["", "-", "0", "0", "0", "0", "287"]);
+            trucksEnRoutes = [[new Dag(stort), new Dag(stort), new Dag(stort), new Dag(stort), new Dag(stort)], [new Dag(stort), new Dag(stort), new Dag(stort), new Dag(stort), new Dag(stort)]];
             distDict = dictInput;
             alpha = 0.95F;
             rnd = rndIn;
@@ -107,15 +108,19 @@ namespace GroteOpdracht
                 {
                     // calculate the score of each route in the beginning
 
-                    Route r = trucksEnRoutes[truck][i];
-                    if (r.route != null)
+                    Dag d = trucksEnRoutes[truck][i];
+                    if (d.routes == null) continue;
+                    foreach(Route r in d.routes)
                     {
-                        foreach (Bedrijf b in r.route)
+                        if (r.route != null)
                         {
-                            if (b.predecessor == null)
+                            foreach (Bedrijf b in r.route)
                             {
-                                routekosten += recurseRoute(b);
-                                break;
+                                if (b.predecessor == null)
+                                {
+                                    routekosten += recurseRoute(b);
+                                    break;
+                                }
                             }
                         }
                     }
@@ -136,30 +141,24 @@ namespace GroteOpdracht
         public void ILS()
         {
             // eerst alleen de 1pwk, daarna de andere toevoegen
-            // simulated annealing
 
+            // simpeler begin
             int its = 1000000;
             while (tellertje < its)
             {
-                int routekey = rnd.Next(0, 5);
-                int truckkey = rnd.Next(0, 2);
-                //routekey = 0;
-                //truckkey = 0;
-
-                Route r = trucksEnRoutes[truckkey][routekey];
-
-                addOperation(r);
+                addOperation();
                 tellertje++;
             }
 
-
+            // negeer dit
             int maxIteraties = 1;
             while (false || tellertje < maxIteraties || Math.Exp(-Math.Abs(increment) / T) > 2.0)
             {
                 // doe iteraties
-                int routekey = rnd.Next(0, 5);
+                int dagkey = rnd.Next(0, 5);
                 int truckkey = rnd.Next(0, 2);
-                Route r = trucksEnRoutes[truckkey][routekey];
+                Dag d = trucksEnRoutes[truckkey][dagkey];
+                Route r = d.routes[rnd.Next(d.routes.Count)];
 
 
                 int operation = rnd.Next(3);
@@ -169,13 +168,13 @@ namespace GroteOpdracht
                         swapWithinDay(r);
                         break;
                     case 1:
-                        replaceStop(r);
+                        //replaceStop(r);
                         break;
                     case 2:
                         swapBetweenDays(); // werkt niet
                         break;
                     default:
-                        addOperation(r);
+                        //addOperation(r);
                         break;
                 }
 
@@ -187,10 +186,10 @@ namespace GroteOpdracht
 
             }
         }
-        // kijkt of de huidige increment geaccepteerd word in de operation
+        // kijkt of de huidige increment geaccepteerd word in de operation, op basis van simulated annealing
         bool acceptIncrement()
         {
-            if (increment > 0)
+            if (increment < 0)
             {
                 return true;
             }
@@ -200,44 +199,53 @@ namespace GroteOpdracht
             }
             return false;
         }
-        void removeStop(Route r)
+        void removeStop()
         {
+            // kies een route
+            int dagkey = rnd.Next(0, 5);
+            int truckkey = rnd.Next(0, 2);
+            Dag d = trucksEnRoutes[truckkey][dagkey];
+
+            Route r = d.routes[rnd.Next(d.routes.Count)];
+            // kies een bedrijf om te verwijderen
             Bedrijf ene = r.route[rnd.Next(r.route.Count)];
+
+
             r.route.Remove(ene);
-            r.capacitiet -= ene.cont * ene.vpc;
+            r.capaciteit -= ene.cont * ene.vpc;
             r.tijdsduur -= rijtijdKosten(ene);
         }
-        void replaceStop(Route r)
-        {
-            int key = rnd.Next(0, grabbelton.Count);
-            Bedrijf ene = grabbelton[key];
+        //void replaceStop(Route r)
+        //{
+        //    int key = rnd.Next(0, grabbelton.Count);
+        //    Bedrijf ene = grabbelton[key];
 
-            int otherKey = rnd.Next(0, r.route.Count);
-            Bedrijf andere = r.route[otherKey];
+        //    int otherKey = rnd.Next(0, r.route.Count);
+        //    Bedrijf andere = r.route[otherKey];
 
-            r.route.Remove(andere);
-            grabbelton.Remove(ene);
+        //    r.route.Remove(andere);
+        //    grabbelton.Remove(ene);
 
 
-            if (isValidRoute(r, ene, andere.predecessor, andere.successor))
-            {
-                ene.predecessor = andere.predecessor;
-                ene.successor = andere.successor;
-                increment = -(ene.ldm * 3) + andere.ldm * 3 + rijtijdKosten(ene) - rijtijdKosten(andere);
-                if (acceptIncrement())
-                r.route.Add(ene);
-                grabbelton.Add(andere);
-            }
-        }
+        //    if (isValidRoute(r, ene, andere.predecessor, andere.successor).Item1)
+        //    {
+        //        ene.predecessor = andere.predecessor;
+        //        ene.successor = andere.successor;
+        //        increment = -(ene.ldm * 3) + andere.ldm * 3 + rijtijdKosten(ene) - rijtijdKosten(andere);
+        //        if (acceptIncrement())
+        //        r.route.Add(ene);
+        //        grabbelton.Add(andere);
+        //    }
+        //}
         void swapBetweenDays()
         {
-            int routekey = rnd.Next(0, 5);
+            int dagkey = rnd.Next(0, 5);
             int truckkey = rnd.Next(0, 2);
-            Route r = trucksEnRoutes[truckkey][routekey];
+            Dag d = trucksEnRoutes[truckkey][dagkey];
 
-            int routekey2 = rnd.Next(0, 5);
+            int dagkey2 = rnd.Next(0, 5);
             int truckkey2 = rnd.Next(0, 2);
-            Route r2 = trucksEnRoutes[truckkey2][routekey2];
+            Dag d2 = trucksEnRoutes[truckkey2][dagkey2];
 
         }
         void swapWithinDay(Route r)
@@ -266,45 +274,43 @@ namespace GroteOpdracht
             r.route.Add(ene);
             r.route.Add(andere);
         }
-        void addOperation(Route r)
+        void addOperation()
         {
+            // doe het in de operation, is netter
+            int dagkey = rnd.Next(0, 5);
+            int truckkey = rnd.Next(0, 2);
+            //dagkey = 0;
+            //truckkey = 0;
+
+            Dag d = trucksEnRoutes[truckkey][dagkey];
+            Route r = d.routes[rnd.Next(d.routes.Count)];
+
+
             int key = rnd.Next(0, grabbelton.Count);
             Bedrijf b = grabbelton[key]; // kan nooit voor het eerste element komen
+            
+            // als er nog niet genoeg dingen in de lijst zitten
             if (r.route.Count < 2) 
             { 
-                // als je de stort kies
-                if (b.matrixID == 287)
-                {
-                    // als er geen predecessor is is rijtijd 0 anders rij naar b.
-                    float rijtijd = b.predecessor == null ? 0 : distDict[(b.predecessor.matrixID, b.matrixID)];
-                    r.tijdsduur += 30 + rijtijd; // voeg leegtijd toe
-                    r.capacitiet = 0; // leeg de truck
-                    grabbelton.Add(b); // laat de mogelijkheid toe om hem nog eens te kiezen.
-                }
-                r.route.Add(b); 
+                r.route.Add(b);
             }
 
             Bedrijf predecessor = r.route[rnd.Next(r.route.Count)]; // grab a random element from the route as the predecessor
-            Bedrijf successor = r.route[rnd.Next(r.route.Count)]; // grab a random element from the route as the predecessor
+            Bedrijf successor = predecessor.successor; // grab a random element from the route as the predecessor
 
-
-            if (isValidRoute(r, b, predecessor, successor) && predecessor.matrixID != successor.matrixID)
+            (bool, float, float) response = isValidRoute(d, r, b, predecessor, successor);
+            if (successor != null && response.Item1)
             {
+                d.tijdsduur += response.Item2;
+                r.capaciteit += response.Item3;
+
                 predecessor.successor = b;
                 predecessor.successor.predecessor = b;
                 b.predecessor = predecessor;
                 b.successor = predecessor.successor;
 
-                if (b.matrixID == 287)
-                {
-                    // als er geen predecessor is is rijtijd 0 anders rij naar b.
-                    float rijtijd = b.predecessor == null ? 0 : distDict[(b.predecessor.matrixID, b.matrixID)];
-                    r.tijdsduur += 30 + rijtijd;
-                    r.capacitiet = 0;
-                    grabbelton.Add(b);
-                    Console.WriteLine("STORT BEZOCHT");
-                }
-
+                // als we toevoegen aan de enige lege lijst, is er geen lege lijst meer.
+                if (r.route.Count == 2) { d.eenlegeroute = false; }
 
                 // reken de increment uit
                 float inc = -(b.ldm * 3) + rijtijdKosten(b);
@@ -314,14 +320,25 @@ namespace GroteOpdracht
                 {
                     score += inc;
                     r.route.Add(b);
-                    grabbelton.Remove(b); // dit kan O(1), is soms O(n)
+                    grabbelton.Remove(b); // dit kan O(1), is vooral O(n)
+                }
+            }
+            else if (!isValidRoute(d, r, b, predecessor, successor).Item1)
+            {
+                // voeg nieuwe lijst toe aan dag
+                if (!d.eenlegeroute)
+                {
+                    d.routes.Add(new Route(stort));
+                    d.tijdsduur += 30; // omdat er een stort is toegevoegd.
+                    d.eenlegeroute = true;
                 }
             }
         }
         float rijtijdKosten(Bedrijf b)
         {
+            // je moet alleen maar gebruik maken van de een of de andere, niet allebei
             float naar;
-            if (b.predecessor != null) // kan in 1 regel
+            if (b.predecessor != null)
             { 
                 naar = distDict[(b.predecessor.matrixID, b.matrixID)];
             } else
@@ -329,50 +346,39 @@ namespace GroteOpdracht
                 naar = distDict[(287, b.matrixID)]; // gebruik de stort als predecessor als die er niet is
             }
 
-            float van;
-            if (b.successor != null) // kan in 1 regel
-            {
-                van = distDict[(b.matrixID, b.successor.matrixID)];
-            }
-            else
-            {
-                van = distDict[(b.matrixID, 287)]; // gebruik de stort als successor als die er niet is
-                // houdt dit in dat je dan ook weer tijden moet aanpassen?
-            }
-
-            float kosten = van + naar;
+            float kosten = naar;
             return kosten;
         }
 
         // check of de gegeven route valide is als dit bedrijf erbij komt
-        bool isValidRoute(Route r, Bedrijf b, Bedrijf pred, Bedrijf suc)
+        (bool, float, float) isValidRoute(Dag d, Route r, Bedrijf b, Bedrijf pred, Bedrijf suc)
         {
+            // capaciteit werkt niet
             float tijdAdd;
-            if (b.predecessor == null)
-            {
-                tijdAdd = distDict[(b.matrixID, suc.matrixID)] + b.ldm;
-            }
-            else
-            {
-                tijdAdd = distDict[(pred.matrixID, b.matrixID)] + b.ldm;
-            }
+            tijdAdd = distDict[(pred.matrixID, suc.matrixID)] + distDict[(b.matrixID, suc.matrixID)] + b.ldm - distDict[(pred.matrixID, suc.matrixID)];
             float capAdd = b.cont * b.vpc;
-            if (r.tijdsduur + tijdAdd > 12 * 60) { return false; }
-            if (r.capacitiet + capAdd > 100000) { return false; }
-            r.tijdsduur += tijdAdd;
-            r.capacitiet += capAdd;
-            return true;
+
+            if (d.tijdsduur + tijdAdd > 12 * 60) { return (false, 0, 0); }
+            if (r.capaciteit + capAdd > 100000) { return (false, 0, 0); } // hier moet de dag geupdate 
+
+            return (true, tijdAdd, capAdd);
         }
     }
     public class Route
     {
         public List<Bedrijf> route;
-        public float tijdsduur;
-        public float capacitiet;
-        // willen we een laatste element bijhouden.
-        public Route()
+        public float tijdsduur; // dit heb je niet nodig
+        public float capaciteit;
+        // willen we een laatste element bijhouden?
+        public Route(Bedrijf stort)
         {
             route = new List<Bedrijf>();
+            Bedrijf s1 = stort;
+            Bedrijf s2 = stort;
+            s1.successor = s2;
+            s2.predecessor = s1;
+            route.Add(s1);
+            route.Add(s2);
         }
     }
     public class Bedrijf
@@ -393,6 +399,26 @@ namespace GroteOpdracht
             vpc = int.Parse(parts[4]);
             ldm = float.Parse(parts[5]);
             matrixID = int.Parse(parts[6]);
+        }
+    }
+    public class Dag
+    {
+        public float tijdsduur; // in minuten
+        public List<Route> routes;
+        public bool eenlegeroute; // hou een boolean bij van of er een lege route is
+        public Dag(Bedrijf stort)
+        {
+            routes = new List<Route>();
+            routes.Add(new Route(stort));
+            eenlegeroute = true;
+            tijdsduur += 30;
+        }
+        public void updateTijd()
+        {
+            foreach (Route route in routes)
+            {
+                tijdsduur += route.tijdsduur;
+            }
         }
     }
 }
