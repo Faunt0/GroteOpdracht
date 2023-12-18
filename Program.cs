@@ -236,7 +236,7 @@ namespace GroteOpdracht
         public void ILS()
         {
             // simpeler begin
-            int its = 10000000;
+            int its = 10000;
             while (tellertje < its && T > 0.00005F)
             {
                 float oldscore = score;
@@ -255,9 +255,9 @@ namespace GroteOpdracht
                     //case 3:
                     //    removeStop();
                     //    break;
-                    //case 1:
-                    //    addRoute();
-                    //    break;
+                    case 1:
+                        addRoute();
+                        break;
                     default:
                         addOperation();
                         break;
