@@ -3,6 +3,7 @@ using System;
 using System.IO;
 using System.Collections.Generic;
 using System.Security.Cryptography;
+using System.Collections.Specialized;
 
 namespace GroteOpdracht
 {
@@ -12,7 +13,13 @@ namespace GroteOpdracht
         static void Main()
         {
             // bedrijvenlijst:
-            float totaalLDM = 0;
+            Console.WriteLine("Start from empty [y/n]: ");
+            string ans = Console.ReadLine();
+            if (ans == "y")
+            {
+
+            }
+
             List<Bedrijf> grabbelton = new List<Bedrijf>();
             using (var reader = new StreamReader("../../../orderbestand.txt"))
             {
@@ -27,7 +34,6 @@ namespace GroteOpdracht
                     Bedrijf bv = new Bedrijf(parts);
 
                     grabbelton.Add(bv);
-                    totaalLDM += bv.ldm * 3;
                 }
             }
             
@@ -54,6 +60,8 @@ namespace GroteOpdracht
             Oplossing oplossing = new Oplossing(fileDict, rndin);
             oplossing.grabbelton = grabbelton;
             oplossing.beginScore(grabbelton, fileDict);
+            oplossing.timetravel_decline = (0, oplossing.score);
+
             Console.WriteLine($"score eerst: {oplossing.score}");
 
             DateTime before = DateTime.Now;
@@ -68,6 +76,7 @@ namespace GroteOpdracht
             Console.WriteLine($"speed:\t\t{speed} iterations/s");
             Console.WriteLine($"T waarde:\t{oplossing.T}");
             Console.WriteLine($"plateau count:\t{oplossing.plateauCount}");
+            Console.WriteLine($"Traveling time: {oplossing.timetravel_decline.Item1}\t\tDecline penalty: {oplossing.timetravel_decline.Item2}");
             Console.WriteLine("Oplossing Opslaan? [y/n]:\t");
             string save = Console.ReadLine();
             if (save == "y")
@@ -85,11 +94,14 @@ namespace GroteOpdracht
                         List<string> strings = new List<string>();
                         foreach (Route r in routes)
                         {
-                            List<string> res = r.makeString(r.route[0], index);
-                            res.Reverse();
-                            foreach (string s in res) { strings.Add(s); }
+                            if (r.route.Count > 2)
+                            {
+                                List<string> res = r.makeString(r.route[0], index);
+                                res.Reverse();
+                                foreach (string s in res) { strings.Add(s); }
+                                index += res.Count;
+                            }
 
-                            index += res.Count;
                         }
 
                         foreach (string s in strings)
@@ -120,6 +132,7 @@ namespace GroteOpdracht
         public string[] stort;
         public int tellertje;
         public float score;
+        public (float, float) timetravel_decline;
         public int plateauCount;
         public float increment;
         public float T = 8000;
@@ -144,7 +157,7 @@ namespace GroteOpdracht
             float grabbeltonKosten = 0;
             foreach (Bedrijf b in grabbelton)
             {
-                grabbeltonKosten += b.ldm * 3;
+                grabbeltonKosten += b.ldm * 3 * b.freq;
             }
             for (int truck = 0; truck < 2; truck++)
             {
@@ -180,7 +193,7 @@ namespace GroteOpdracht
             {
                 return 0;
             }
-            return rijtijd(b.successor, b) + recurseRoute(b.successor);
+            return b.ldm + rijtijd(b.successor, b) + recurseRoute(b.successor);
         }
 
         public void ILS()
@@ -196,7 +209,7 @@ namespace GroteOpdracht
                     //case 0:
                     //    swapWithinDay();
                     //    break;
-                    //case 1:
+                    //case 2:
                     //    swapBetweenDays();
                     //    break;
                     //case 2:
@@ -258,7 +271,7 @@ namespace GroteOpdracht
             {
                 Bedrijf b = r.route[rnd.Next(0, r.route.Count)];
 
-                if (b.successor != null && b.predecessor != null) // haal niet een van de stort weg
+                if (b.freq == 1 && b.successor != null && b.predecessor != null) // haal niet een van de stort weg
                 {
                     if (r.route.Count == 3)
                     {
@@ -269,7 +282,11 @@ namespace GroteOpdracht
                         if (acceptIncrement())
                         {
                             grabbelton.Add(b);
-                            d.routes.Remove(r);
+                            if (d.routes.Count > 1)
+                            {
+                                d.routes.Remove(r);
+                            }
+                            d.tijdsduur += increment;
                             score += increment;
                         }
                     }
@@ -312,7 +329,7 @@ namespace GroteOpdracht
                 Bedrijf b1 = r1.route[rnd.Next(0, r1.route.Count)]; // pak een bedrijf
                 Bedrijf b2 = grabbelton[rnd.Next(0, grabbelton.Count)]; // kan nooit voor het eerste element komen
 
-                if (b1 != b2 && b1.successor != null && b1.predecessor != null)
+                if (b1.freq == 1 && b2.freq == 1 && b1 != b2 && b1.successor != null && b1.predecessor != null)
                 {
                     // werk niet volledig
                     float inc = -b2.ldm * 2 + b1.ldm * 2 + rijtijd(b2, b1.predecessor) + rijtijd(b1.successor, b2) - rijtijd(b1, b1.predecessor) - rijtijd(b1.successor, b1);
@@ -369,13 +386,14 @@ namespace GroteOpdracht
 
                     increment = inc1 + inc2;
 
-                    float capDelta1 = b2.cont * b1.vpc - b1.cont * b1.vpc;
+                    float capDelta1 = b2.cont * b2.vpc - b1.cont * b1.vpc;
                     float capDelta2 = b1.cont * b1.vpc - b2.cont * b2.vpc;
 
-                    if (d1.tijdsduur + inc1 < 12 * 60 && d2.tijdsduur + inc2 < 12 * 60 && r1.capaciteit + capDelta1 < 100000 && r2.capaciteit + capDelta2 < 100000 && acceptIncrement())
+                    // weet niet of de tijdsduur van de dag goed gedaan wordt hier
+                    if (d2.tijdsduur + inc1 - b2.ldm + b1.ldm < 12 * 60 && d1.tijdsduur + inc2 - b1.ldm + b2.ldm < 12 * 60 && r1.capaciteit + capDelta1 < 100000 && r2.capaciteit + capDelta2 < 100000 && acceptIncrement())
                     {
-                        d1.tijdsduur += inc1;
-                        d2.tijdsduur += inc2;
+                        d1.tijdsduur += inc2 - b1.ldm + b2.ldm;
+                        d2.tijdsduur += inc1 - b2.ldm + b1.ldm;
                         r1.capaciteit += capDelta1;
                         r2.capaciteit += capDelta2;
 
@@ -398,6 +416,7 @@ namespace GroteOpdracht
             int dagkey = rnd.Next(0, 5);
             int truckkey = rnd.Next(0, 2);
 
+            // moet dit ook nog rekening houden met twee trucks? of alleen binnen een enkele truck?
             Dag d = trucksEnRoutes[truckkey][dagkey];
             Route r1 = d.routes[rnd.Next(d.routes.Count)];
             Route r2 = d.routes[rnd.Next(d.routes.Count)];
@@ -466,12 +485,18 @@ namespace GroteOpdracht
 
                 if (acceptIncrement() && d.tijdsduur + tijdDelta < 12 * 60 && b.freq == 1)
                 {
+                    b.ReplaceChains(pred, succ);
+                    pred.ReplaceChains(null, b);
+                    succ.ReplaceChains(b, null);
+
                     newRoute.capaciteit += capAdd;
+                    newRoute.route.Add(b);
                     d.routes.Add(newRoute);
                     d.tijdsduur += tijdDelta;
                     grabbelton.Remove(b);
 
                     score += increment;
+                    timetravel_decline = (timetravel_decline.Item1 + tijdDelta, timetravel_decline.Item2 - (b.ldm * 3));
                 }
             }
         }
@@ -496,6 +521,11 @@ namespace GroteOpdracht
                 {
                     float capDelta = b.vpc * b.cont;
                     float tijdDelta = b.ldm + rijtijd(b, predecessor) + rijtijd(successor, b) - rijtijd(successor, predecessor);
+
+                    if (r.route.Count == 2)
+                    {
+                        tijdDelta += 30;
+                    }
                     increment = -(b.ldm * 3) + tijdDelta;
 
                     if (acceptIncrement() && d.tijdsduur + tijdDelta < 12 * 60 && r.capaciteit + capDelta <= 100000)
@@ -510,13 +540,93 @@ namespace GroteOpdracht
                         score += increment;
                         r.route.Add(b);
                         grabbelton.Remove(b); // dit kan O(1), is vooral O(n)
+
+                        timetravel_decline = (timetravel_decline.Item1 + tijdDelta, timetravel_decline.Item2 - (b.ldm * 3));
                     }
                     
                 }
             }
-
-
         }
+        void addMultiple()
+        {
+            if (grabbelton.Count > 0)
+            {
+                int key = rnd.Next(0, grabbelton.Count);
+                Bedrijf b = grabbelton[key];
+                int[][] dagen = [[0], [0, 3], [0, 2, 4], [0, 1, 2, 3]];
+                int randomness = 0;
+
+                bool constraints = true;
+                List<float> tijdDeltas = new List<float>();
+                List<float> capDeltas = new List<float>();
+                List<(Bedrijf, Bedrijf)> predsucc = new List<(Bedrijf, Bedrijf)>();
+                List<Dag> dagenlijst = new List<Dag>();
+                List<Route> routes = new List<Route>();
+                for (int i = 0; i < b.freq; i++)
+                {
+                    int truckkey = rnd.Next(0, 2);
+                    Dag dag = trucksEnRoutes[truckkey][dagen[b.freq][i]]; // get the day, truck can be random
+                    Route r = dag.routes[rnd.Next(dag.routes.Count)];
+
+                    Bedrijf predecessor = r.route[rnd.Next(r.route.Count)]; // grab a random element from the route as the predecessor
+                    Bedrijf successor = predecessor.successor; // grab a random element from the route as the predecessor
+
+                    if (successor != null)
+                    {
+                        float capDelta = b.vpc * b.cont;
+                        float tijdDelta = b.ldm + rijtijd(b, predecessor) + rijtijd(successor, b) - rijtijd(successor, predecessor);
+
+                        constraints = constraints && (r.capaciteit + capDelta <= 100000) && (dag.tijdsduur + tijdDelta < 12 * 60);
+                        capDeltas.Add(capDelta);
+                        tijdDeltas.Add(tijdDelta);
+                        predsucc.Add((predecessor, successor));
+
+                        dagenlijst.Add(dag);
+                        routes.Add(r);
+                    }
+                }
+
+                increment = -(b.ldm * 3) + tijdDeltas.Sum(); // hou hier geen rekening met de frequentie
+
+                if (acceptIncrement() && constraints)
+                {
+                    for (int i = 0; i < b.freq; i++)
+                    {
+                        dagenlijst[i].tijdsduur += tijdDeltas[i];
+                        routes[i].capaciteit += capDeltas[i];
+
+                        Bedrijf bclone = b; // werkt niet, heb eigenlijk copieen nodig anders vervang ik de predecessors en successors ipv van ze allemaal bijhouden.
+                    }
+                    score += increment;
+                }
+
+
+                //Bedrijf predecessor = r.route[rnd.Next(r.route.Count)]; // grab a random element from the route as the predecessor
+                //Bedrijf successor = predecessor.successor; // grab a random element from the route as the predecessor
+                //if (successor != null && b.freq == 1)
+                //{
+                //    float capDelta = b.vpc * b.cont;
+                //    float tijdDelta = b.ldm + rijtijd(b, predecessor) + rijtijd(successor, b) - rijtijd(successor, predecessor);
+                //    increment = -(b.ldm * 3) + tijdDelta;
+
+                //    if (acceptIncrement() && d.tijdsduur + tijdDelta < 12 * 60 && r.capaciteit + capDelta <= 100000)
+                //    {
+                //        d.tijdsduur += tijdDelta;
+                //        r.capaciteit += capDelta;
+
+                //        b.ReplaceChains(predecessor, successor);
+                //        predecessor.ReplaceChains(predecessor.predecessor, b);
+                //        successor.ReplaceChains(b, successor.successor);
+
+                //        score += increment;
+                //        r.route.Add(b);
+                //        grabbelton.Remove(b); // dit kan O(1), is vooral O(n)
+                //    }
+
+                //}
+            }
+        }
+        
         float rijtijd(Bedrijf b, Bedrijf pred)
         {
             return distDict[(pred.matrixID, b.matrixID)];
