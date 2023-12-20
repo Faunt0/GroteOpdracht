@@ -16,7 +16,7 @@ namespace GroteOpdracht
             using (var reader = new StreamReader("../../../orderbestand.txt"))
             {
                 string firstline = reader.ReadLine();
-                Console.WriteLine($"{firstline}");
+                //Console.WriteLine($"{firstline}");
 
                 int index = 0;
                 string line;
@@ -46,12 +46,12 @@ namespace GroteOpdracht
             }
 
             Random rndin = new Random();
-            Console.WriteLine(rndin.ToString());
+            //Console.WriteLine(rndin.ToString());
             Oplossing oplossing = new Oplossing(fileDict, rndin);
 
-            //Console.WriteLine("Start from empty [y/n]: ");
-            //string ans = Console.ReadLine();
-            string ans = "y";
+            Console.WriteLine("Start from empty [y/n]: ");
+            string ans = Console.ReadLine();
+            //string ans = "y";
             if (ans == "n")
             {
                 Oplossing op = new Oplossing(fileDict, rndin);
@@ -63,26 +63,29 @@ namespace GroteOpdracht
                 int index = 0;
                 foreach (var file in d.GetFiles("*.txt"))
                 {
-                    Console.WriteLine($"{index}.\t{file.Name}");
+                    Console.WriteLine($"\t{index}.\t{file.Name}");
+                    index++;
                     files.Add(file.FullName);
                 }
+
                 string fileI = Console.ReadLine();
                 using (var reader = new StreamReader(files[int.Parse(fileI)]))
                 {
+                    // maak de routes
                     Route r = new Route(oplossing.stort);
                     string line;
                     while ((line = reader.ReadLine()) != null)
                     {
                         string[] parts = line.Replace(" ", "").Split(";");
-                        Dag dag = oplossing.trucksEnRoutes[int.Parse(parts[0])][int.Parse(parts[1])];
+                        Dag dag = oplossing.trucksEnRoutes[int.Parse(parts[0]) - 1][int.Parse(parts[1]) - 1];
 
                         if (int.Parse(parts[3]) == 0)
                         {
-                            dag.tijdsduur += oplossing.recurseRoute(r.route[0]);
+                            r.maakLinkedList();
                             dag.routes.Add(r);
-                            r.route.Clear();
+
+                            r = new Route(oplossing.stort);
                             r.capaciteit = 0;
-                            dag.tijdsduur += 30;
                         }
                         else
                         {
@@ -91,117 +94,135 @@ namespace GroteOpdracht
                             {
                                 grabbelton.Remove(b.order); // dit kan niet voor dingen die vaker voor moeten komen. maar wat doe je dan
                             }
-                            r.maakRoute(fileDict);
+
                             r.route.Add(b);
                             r.capaciteit += b.cont * b.vpc;
                         }
                     }
-
                 }
             }
 
 
             oplossing.grabbelton = grabbelton.Values.ToList();
-            oplossing.beginScore();
-            oplossing.timetravel_decline = (0, oplossing.score);
 
-            Console.WriteLine($"score eerst: {oplossing.score}");
-
-            DateTime before = DateTime.Now;
-            oplossing.ILS();
-            DateTime after = DateTime.Now;
-            TimeSpan ts = after - before;
-
-            Console.WriteLine($"incrementele score daarna: {oplossing.score}");
-            oplossing.beginScore();
-            Console.WriteLine($"berekende score daarna: {oplossing.score}");
-            Console.WriteLine($"beste score?: {oplossing.beste.Item1}");
-            Console.WriteLine($"Milliseconden:\t{ts.TotalMilliseconds}");
-            Console.WriteLine($"Iteraties:\t{oplossing.tellertje}");
-            float speed = oplossing.tellertje / ((float)ts.TotalMilliseconds / 1000);
-            Console.WriteLine($"speed:\t\t{speed} iterations/s");
-            Console.WriteLine($"T waarde:\t{oplossing.T}");
-            Console.WriteLine($"plateau count:\t{oplossing.plateauCount}");
-            Console.WriteLine("Kies een oplossing actie:");
-            Console.WriteLine($"\t0.\tBeste Oplossing:\tScore = {oplossing.beste.Item1}");
-            Console.WriteLine($"\t1.\tLaatste Oplossing:\tScore = {oplossing.score}");
-            Console.WriteLine($"\t2.\tBeide Oplossingen");
-            Console.WriteLine($"\t3.\tGeen van beide");
-            string save = Console.ReadLine();
-            if (save == "0") // alleen de laatste oplossing saven
+            string save = "-";
+            while (save == "-" || save == "4" || save == "5")
             {
-                // 1; 1; 1; 10
-                List<string> lines = new List<string>();
+                oplossing.beginScore();
+                Console.WriteLine($"score eerst: {oplossing.score}");
+                DateTime before = DateTime.Now;
+                oplossing.ILS();
+                DateTime after = DateTime.Now;
+                TimeSpan ts = after - before;
 
-                for (int t = 0; t < 2; t++)
+                Console.WriteLine($"incrementele score daarna: {oplossing.score}");
+                oplossing.beginScore();
+                Console.WriteLine($"berekende score daarna: {oplossing.score}");
+                Console.WriteLine($"beste score?: {oplossing.beste.Item1}");
+                Console.WriteLine($"Milliseconden:\t{ts.TotalMilliseconds}");
+                Console.WriteLine($"Iteraties:\t{oplossing.tellertje}");
+                float speed = oplossing.tellertje / ((float)ts.TotalMilliseconds / 1000);
+                Console.WriteLine($"speed:\t\t{speed} iterations/s");
+                Console.WriteLine($"T waarde:\t{oplossing.T}");
+                Console.WriteLine($"plateau count:\t{oplossing.plateauCount}");
+                Console.WriteLine("Kies een oplossing actie:");
+                Console.WriteLine($"\t0.\tBeste Oplossing:\tScore = {oplossing.beste.Item1}");
+                Console.WriteLine($"\t1.\tLaatste Oplossing:\tScore = {oplossing.score}");
+                Console.WriteLine($"\t2.\tBeide Oplossingen");
+                Console.WriteLine($"\t3.\tGeen van beide");
+                Console.WriteLine($"\t4.\tDoe nogmaals hetzelfde aantal iteraties met de laatste oplossing");
+                Console.WriteLine($"\t5.\tDoe nogmaals hetzelfde aantal iteraties met de beste oplossing");
+                save = Console.ReadLine().Trim();
+                if (save == "1") // alleen de laatste oplossing saven
                 {
-                    for (int d = 0; d < 5; d++)
+                    // 1; 1; 1; 10
+                    List<string> lines = new List<string>();
+
+                    for (int t = 0; t < 2; t++)
                     {
-                        List<Route> routes = oplossing.trucksEnRoutes[t][d].routes;
-
-                        int index = 0;
-                        List<string> strings = new List<string>();
-                        foreach (Route r in routes)
+                        for (int d = 0; d < 5; d++)
                         {
-                            List<string> res = r.makeString(r.route[0], index);
-                            res.Reverse();
-                            foreach (string s in res) { strings.Add(s); }
+                            List<Route> routes = oplossing.trucksEnRoutes[t][d].routes;
 
-                            index += res.Count;
-                        }
+                            int index = 0;
+                            List<string> strings = new List<string>();
+                            foreach (Route r in routes)
+                            {
+                                List<string> res = r.makeString(r.route[0], index);
+                                res.Reverse();
+                                foreach (string s in res) { strings.Add(s); }
 
-                        foreach (string s in strings)
-                        {
-                            //Console.WriteLine($"{t}; {d}; " + s);
-                            lines.Add($"{t + 1}; {d + 1}; " + s);
+                                index += res.Count;
+                            }
+
+                            foreach (string s in strings)
+                            {
+                                //Console.WriteLine($"{t}; {d}; " + s);
+                                lines.Add($"{t + 1}; {d + 1}; " + s);
+                            }
                         }
                     }
-                }
-                Console.WriteLine("Name the save file:\t");
-                string fileName = Console.ReadLine();
-                StreamWriter sw = new StreamWriter($"./oplossingen/{fileName}.txt");
-                foreach (string line in lines)
-                {
-                    sw.WriteLine(line);
-                }
-                sw.Close();
-            }
-            if (save == "1") // alleen de beste oplossing saven
-            {
-                List<string> lines = new List<string>();
-
-                for (int t = 0; t < 2; t++)
-                {
-                    for (int d = 0; d < 5; d++)
+                    Console.WriteLine("Name the save file:\t");
+                    string fileName = Console.ReadLine();
+                    StreamWriter sw = new StreamWriter($"./oplossingen/{fileName}.txt");
+                    foreach (string line in lines)
                     {
-                        List<Route> routes = oplossing.beste.Item2[t][d].routes;
+                        sw.WriteLine(line);
+                    }
+                    sw.Close();
+                }
+                else if (save == "0") // alleen de beste oplossing saven
+                {
+                    List<string> lines = new List<string>();
 
-                        int index = 0;
-                        List<string> strings = new List<string>();
-                        foreach (Route r in routes)
+                    for (int t = 0; t < 2; t++)
+                    {
+                        for (int d = 0; d < 5; d++)
                         {
-                            List<string> res = r.makeString(r.route[0], index);
-                            res.Reverse();
-                            foreach (string s in res) { strings.Add(s); }
+                            List<Route> routes = oplossing.beste.Item2[t][d].routes;
 
-                            index += res.Count;
-                        }
+                            int index = 0;
+                            List<string> strings = new List<string>();
+                            foreach (Route r in routes)
+                            {
+                                List<string> res = r.makeString(r.route[0], index);
+                                res.Reverse();
+                                foreach (string s in res) { strings.Add(s); }
 
-                        foreach (string s in strings)
-                        {
-                            //Console.WriteLine($"{t}; {d}; " + s);
-                            lines.Add($"{t + 1}; {d + 1}; " + s);
+                                index += res.Count;
+                            }
+
+                            foreach (string s in strings)
+                            {
+                                //Console.WriteLine($"{t}; {d}; " + s);
+                                lines.Add($"{t + 1}; {d + 1}; " + s);
+                            }
                         }
                     }
+                    Console.WriteLine("Name the save file:\t");
+                    string fileName = Console.ReadLine();
+                    StreamWriter sw = new StreamWriter($"./oplossingen/{fileName}.txt");
+                    foreach (string line in lines)
+                    {
+                        sw.WriteLine(line);
+                    }
+                    sw.Close();
                 }
-                Console.WriteLine("Name the save file:\t");
-                string fileName = Console.ReadLine();
-                StreamWriter sw = new StreamWriter($"./oplossingen/{fileName}.txt");
-                foreach (string line in lines)
+                else if (save == "4")
                 {
-                    sw.WriteLine(line);
+                    oplossing.tellertje = 0;
+                    oplossing.T = 60;
                 }
-                sw.Close();
+                else if (save == "5")
+                {
+                    oplossing.trucksEnRoutes = oplossing.beste.Item2;
+                    oplossing.tellertje = 0;
+                    oplossing.T = 0;
+                }
+                else
+                {
+                    break;
+                }
             }
         }
     }
@@ -209,17 +230,16 @@ namespace GroteOpdracht
     {
         public Dictionary<(int, int), float> distDict;
         public Dag[][] trucksEnRoutes;
-        public (float, Dag[][] trucksEnRoutes) beste;
+        public (float, Dag[][]) beste;
         public List<Bedrijf>? grabbelton;
         public string[] stort;
         public int tellertje;
         public float score;
-        public (float, float) timetravel_decline;
         public int plateauCount;
         public float increment;
-        public int iterations = 100000000;
-        public float T = 1;
-        public int Q = 2000000;
+        public long iterations = 10000000;
+        public float T = 60;
+        public int Q = 200000;
         public float alpha;
         public Random rnd;
         public Oplossing(Dictionary<(int, int), float> dictInput, Random rndIn)
@@ -236,7 +256,7 @@ namespace GroteOpdracht
 
         public void beginScore()
         {
-            float routekosten = 0;
+            float travelTime = 0;
             float grabbeltonKosten = 0;
             foreach (Bedrijf b in grabbelton)
             {
@@ -249,12 +269,13 @@ namespace GroteOpdracht
                     // calculate the score of each route in the beginning
 
                     Dag d = trucksEnRoutes[truck][i];
-                    //if (d.routes == null) continue;
+
                     foreach(Route r in d.routes)
                     {
                         if (r.route.Count > 2)
                         {
-                            routekosten += 30;
+                            
+                            float routekosten = 30;
                             foreach (Bedrijf b in r.route)
                             {
                                 if (b.predecessor == null)
@@ -263,11 +284,13 @@ namespace GroteOpdracht
                                     break;
                                 }
                             }
+                            d.tijdsduur += routekosten;
+                            travelTime += routekosten;
                         }
                     }
                 }
             }
-            score = routekosten + grabbeltonKosten;
+            score = travelTime + grabbeltonKosten;
         }
         public float recurseRoute(Bedrijf b)
         {
@@ -838,21 +861,32 @@ namespace GroteOpdracht
             route.Add(s1);
             route.Add(s2);
         }
-        public void maakRoute(Dictionary<(int, int), float> distDict)
+        public void maakLinkedList()
         {
-            float tijd = 0;
-            Bedrijf pred;
-            Bedrijf succ;
+            // roep dit aan om de linked list structuur te maken in de route lijst
             for (int i = 2; i < route.Count; i++)
             {
-                Bedrijf b = route[i];
-                pred = route[i - 1];
+                Bedrijf pred;
+                if (i == 2)
+                {
+                    pred = route[0];
+                }
+                else
+                {
+                    pred = route[i - 1];
+                }
+                Bedrijf succ;
                 if (i + 1 == route.Count)
                 {
-                    succ = route[1]; // laatste stort is dan de successor 
+                    succ = route[1];
                 }
-                else { succ = route[i + 1]; }
-
+                else
+                {
+                    succ = route[i + 1];
+                }
+                Bedrijf b = route[i];
+                pred.ReplaceChains(pred.predecessor, b);
+                succ.ReplaceChains(b, succ.successor);
                 b.ReplaceChains(pred, succ);
             }
         }
