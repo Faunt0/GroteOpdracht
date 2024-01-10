@@ -217,7 +217,8 @@ namespace GroteOpdracht
                 {
                     oplossing.tellertje = 0;
                     oplossing.tries = 0;
-                    oplossing.T = 14;
+                    oplossing.T = 18 / 2;
+                    ///TODO bewaar de originele T ergens zodat je deze hier kunt vermenigvuldigen naar een kleinere waarde (delen?)
                 }
                 // gebruik de tot nu toe beste oplossing opnieuw
                 else if (save == "5")
@@ -246,7 +247,7 @@ namespace GroteOpdracht
         public float score;
         public int plateauCount;
         public float increment;
-        public long iterations = 10000000;
+        public long iterations = 1000000000;
         public long tries = 0;
         public long effective = 100000;
         public float T = 18;
@@ -341,8 +342,8 @@ namespace GroteOpdracht
                 //else if (80 <= op && op < 85) { replaceStop(); }
                 //else if (86 <= op && op < 92) { removeStop(); }
                 //else if (88 <= op && op < 92) { addRoute(); }
-                //else if (50 <= op && op < 92) { shiftWithin(); }
-                else if (92 <= op && op < 100) { addOperation(); }
+                else if (50 <= op && op < 80) { shiftBetween(); }
+                else if (80 <= op && op < 100) { addOperation(); }
                 else
                 {
                     shiftWithin();
@@ -843,7 +844,11 @@ namespace GroteOpdracht
                         r2.capaciteit += capDelta2;
 
                         b1_pred.ReplaceChains(b1_pred.predecessor, b1_succ);
-                        //b1_succ.ReplaceChains()
+                        b1_succ.ReplaceChains(b1_pred, b1_succ.successor);
+                        npred.ReplaceChains(npred_pred, b1);
+                        npred_succ.ReplaceChains(b1, npred_succ.successor);
+                        r1.route.Remove(b1);
+                        r2.route.Add(b1);
                     }
                 }
             }
@@ -1000,6 +1005,14 @@ namespace GroteOpdracht
         float rijtijd(Bedrijf b, Bedrijf pred)
         {
             return distDict[pred.matrixID, b.matrixID];
+            if (pred == null)
+            {
+                return distDict[287, b.matrixID];
+            } 
+            else if (b == null)
+            {
+                return distDict[pred.matrixID, 287];
+            }
         }
 
     }
@@ -1029,7 +1042,8 @@ namespace GroteOpdracht
     }
     public class Route
     {
-        public List<Bedrijf> route;
+        //public List<Bedrijf> route;
+        public List<Bedrijf>[] route;
         public float capaciteit;
         public Route(string[] stort)
         {
