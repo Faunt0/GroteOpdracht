@@ -234,7 +234,7 @@ namespace GroteOpdracht
     {
         public float[,] distDict;
         public Dag[][] trucksEnRoutes;
-        public (float, Dag[][]) beste;
+        public (float, List<string>) beste;
         public List<Bedrijf>? grabbelton;
         public string[] stort;
         public int tellertje;
@@ -735,10 +735,10 @@ namespace GroteOpdracht
                     float tijdDelta = b.ldm + rijtijd(b, predecessor) + rijtijd(successor, b) - rijtijd(successor, predecessor);
 
                     // stel we voegen een bedrijf toe aan een lege route moeten we nog legen bij de stort
-                    if (r.route.Count == 2)
-                    {
-                        tijdDelta += 30;
-                    }
+                    //if (r.route.Count == 2)
+                    //{
+                    //    tijdDelta += 30;
+                    //}
                     increment = -(b.ldm * 3) + tijdDelta;
 
                     // als de increment geaccepteerd worde en er wordt voldaan aan de eisen
@@ -992,14 +992,14 @@ namespace GroteOpdracht
 
                 float capDelta1 = -b1.vpc * b1.cont;
                 float capDelta2 = b1.vpc * b1.cont;
-                if (r1.route.Count == 3)
-                {
-                    tijdDelta1 += -30;
-                }
-                if (r2.route.Count == 2)
-                {
-                    tijdDelta2 += 30;
-                }
+                //if (r1.route.Count == 3)
+                //{
+                //    tijdDelta1 += -30;
+                //}
+                //if (r2.route.Count == 2)
+                //{
+                //    tijdDelta2 += 30;
+                //}
 
                 increment = tijdDelta1 + tijdDelta2;
 
@@ -1011,13 +1011,13 @@ namespace GroteOpdracht
                     d2.tijdsduur += tijdDelta2;
                     r1.capaciteit += capDelta1;
                     r2.capaciteit += capDelta2;
+
                     newSucc.ReplaceChains(b1, newSucc.successor);
                     newSucc_pred.ReplaceChains(newSucc_pred.predecessor, b1);
 
                     b1.ReplaceChains(newSucc_pred, newSucc);
                     b1_pred.ReplaceChains(b1_pred.predecessor, b1_succ);
                     b1_succ.ReplaceChains(b1_pred, b1_succ.successor);
-
 
                     r1.route.Remove(b1);
                     r2.route.Add(b1);
@@ -1125,7 +1125,20 @@ namespace GroteOpdracht
             {
                 routes.Add(new Route(stort));
             }
-            tijdsduur = 0;
+            tijdsduur = 30 * numRoute;
+        }
+        public List<string> makeString()
+        {
+            List<string> res = new List<string>();
+            foreach (Route route in routes)
+            {
+                List<string> routeRes = route.makeString(route.route[0], res.Count);
+                foreach (string s in routeRes)
+                {
+                    res.Add(s);
+                }
+            }
+            return res;
         }
     }
 }
