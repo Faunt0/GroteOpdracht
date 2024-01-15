@@ -241,7 +241,7 @@ namespace GroteOpdracht
         public float score;
         public int plateauCount;
         public float increment;
-        public long iterations = 100000000;
+        public long iterations = 10000000;
         public float T = 30;
         public int Q = 2000000;
         public float alpha;
