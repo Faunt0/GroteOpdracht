@@ -138,32 +138,33 @@ namespace GroteOpdracht
                 if (save == "1") // alleen de laatste oplossing saven
                 {
                     // 1; 1; 1; 10
-                    List<string> lines = new List<string>();
+                    //List<string> lines = new List<string>();
 
-                    for (int t = 0; t < 2; t++)
-                    {
-                        for (int d = 0; d < 5; d++)
-                        {
-                            List<Route> routes = oplossing.trucksEnRoutes[t][d].routes;
+                    //for (int t = 0; t < 2; t++)
+                    //{
+                    //    for (int d = 0; d < 5; d++)
+                    //    {
+                    //        List<Route> routes = oplossing.trucksEnRoutes[t][d].routes;
 
-                            int index = 0;
-                            List<string> strings = new List<string>();
-                            foreach (Route r in routes)
-                            {
-                                List<string> res = r.makeString(r.route[0], index);
-                                res.Reverse();
-                                foreach (string s in res) { strings.Add(s); }
+                    //        int index = 0;
+                    //        List<string> strings = new List<string>();
+                    //        foreach (Route r in routes)
+                    //        {
+                    //            List<string> res = r.makeString(r.route[0], index);
+                    //            res.Reverse();
+                    //            foreach (string s in res) { strings.Add(s); }
 
-                                index += res.Count;
-                            }
+                    //            index += res.Count;
+                    //        }
 
-                            foreach (string s in strings)
-                            {
-                                //Console.WriteLine($"{t}; {d}; " + s);
-                                lines.Add($"{t + 1}; {d + 1}; " + s);
-                            }
-                        }
-                    }
+                    //        foreach (string s in strings)
+                    //        {
+                    //            //Console.WriteLine($"{t}; {d}; " + s);
+                    //            lines.Add($"{t + 1}; {d + 1}; " + s);
+                    //        }
+                    //    }
+                    //}
+                    List<string> lines = oplossing.makeString(oplossing.trucksEnRoutes);
                     Console.WriteLine("Name the save file:\t");
                     string fileName = Console.ReadLine();
                     StreamWriter sw = new StreamWriter($"./oplossingen/{fileName}.txt");
