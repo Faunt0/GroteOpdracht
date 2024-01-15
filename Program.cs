@@ -241,7 +241,7 @@ namespace GroteOpdracht
         public float score;
         public int plateauCount;
         public float increment;
-        public long iterations = 10000000;
+        public long iterations = 1000000000;
         public float T = 30;
         public int Q = 2000000;
         public float alpha;
@@ -318,7 +318,8 @@ namespace GroteOpdracht
                 //else if (85 <= op && op < 88) { removeStop(); }
                 //else if (88 <= op && op < 92) { addRoute(); }
                 //addOperation();
-                if (92 <= op && op < 100) { addOperation(); }
+                if (60 <= op && op < 100) { addOperation(); }
+                else if (30 <= op && op < 50) { shiftBetween2(); }
                 else
                 {
                     shiftWithin();
@@ -841,139 +842,189 @@ namespace GroteOpdracht
 
             if (r.route.Count > 2) // denk niet dat dit nodig is.
             {
-                int ind1 = rnd.Next(r.route.Count);
-                int ind2 = rnd.Next(r.route.Count);
+                int ind1 = rnd.Next(2, r.route.Count); // sla de storten over
+                int ind2 = rnd.Next(1, r.route.Count); // voor de succ moet aan het einde zijn.
                 int freqin1 = rnd.Next(4);
                 int freqin2 = rnd.Next(4);
-                if (ind1 != ind2 && r.route.Count > 0 && r.route.Count > 0)
+
+                if (ind1 != ind2 && r.route[ind1].successor != r.route[ind2])
                 {
                     Bedrijf b1 = r.route[ind1];
-                    Bedrijf b2 = r.route[ind2]; // new predecessor
                     Bedrijf b1_pred = b1.predecessor;
                     Bedrijf b1_succ = b1.successor;
 
-                    Bedrijf b2_pred = b2.predecessor;
-                    Bedrijf b2_succ = b2.successor;
+                    Bedrijf newSucc = r.route[ind2];
+                    Bedrijf ns_pred = newSucc.predecessor;
 
-                    if (b1 != b2 && b1_succ != null && b2_succ != null && b1_pred != null && b2_pred != null)
+                    // bereken de increment op basis van de neighbours
+                    float tijdDelta;
+                    // ns_pred -> newSucc -> b1 -> b1_succ
+                    if (b1_pred == newSucc)
                     {
-                        // bereken de increment op basis van de neighbours
-                        float tijdDelta;
-                        // b1_pred -> b1 -> b2 -> b2_succ
-                        if (b1_succ == b2 && b2_pred == b1)
+                        tijdDelta = -rijtijd(b1_succ, b1) - rijtijd(b1, b1_pred) - rijtijd(newSucc, ns_pred) + rijtijd(b1, ns_pred) + rijtijd(newSucc, b1) + rijtijd(b1_succ, newSucc);
+                    }
+                    else
+                    {
+                        // als ze geen neighbours van elkaar zijn doe dit.
+                        tijdDelta = -rijtijd(b1, b1_pred) - rijtijd(b1_succ, b1) - rijtijd(newSucc, ns_pred) + rijtijd(newSucc, b1) + rijtijd(b1, ns_pred) + rijtijd(b1_succ, b1_pred);
+                    }
+
+                    increment = tijdDelta;
+
+                    if (d.tijdsduur + increment < 12 * 60 && acceptIncrement())
+                    {
+                        d.tijdsduur += increment;
+
+                        // als het buren zijn
+                        if (b1_pred == newSucc) // ns_pred -> newSucc -> b1 -> b1_succ
                         {
-                            tijdDelta = -rijtijd(b1, b1_pred) - rijtijd(b2, b1) - rijtijd(b2_succ, b2) + rijtijd(b2, b1_pred) + rijtijd(b1, b2) + rijtijd(b2_succ, b1);
-                        }
-                        // b2_pred -> b2 -> b1 -> b1_succ
-                        else if (b2_succ == b1 && b1_pred == b2)
-                        {
-                            tijdDelta = -rijtijd(b2, b2_pred) - rijtijd(b1, b2) - rijtijd(b1_succ, b1) + rijtijd(b1, b2_pred) + rijtijd(b2, b1) + rijtijd(b1_succ, b2);
+                            b1.ReplaceChains(ns_pred, newSucc);
+                            b1_succ.ReplaceChains(newSucc, b1_succ.successor);
+
+                            newSucc.ReplaceChains(b1, b1_succ);
+                            ns_pred.ReplaceChains(ns_pred.predecessor, b1);
                         }
                         else
                         {
-                            // als ze geen neighbours van elkaar zijn doe dit.
-                            tijdDelta = -rijtijd(b1, b1_pred) - rijtijd(b1_succ, b1) - rijtijd(b2_succ, b2) + rijtijd(b1, b2) + rijtijd(b2_succ, b1) + rijtijd(b1_succ, b1_pred);
+                            b1.ReplaceChains(ns_pred, newSucc);
+                            b1_pred.ReplaceChains(b1_pred.predecessor, b1_succ);
+                            b1_succ.ReplaceChains(b1_pred, b1_succ.successor);
+
+                            newSucc.ReplaceChains(b1, newSucc.successor);
+                            ns_pred.ReplaceChains(ns_pred.predecessor, b1);
                         }
 
-                        increment = tijdDelta;
-
-                        if (d.tijdsduur + increment < 12 * 60 && acceptIncrement())
-                        {
-                            d.tijdsduur += increment;
-
-                            // als het buren zijn
-                            // b1_pred -> b1 -> b2 -> b2_succ
-                            if (b1_succ == b2 && b2_pred == b1)
-                            {
-                                b1.ReplaceChains(b2, b2_succ);
-                                b2.ReplaceChains(b1_pred, b1);
-
-                                b1_pred.ReplaceChains(b1_pred.predecessor, b2);
-                                b2_succ.ReplaceChains(b1, b2_succ.successor);
-                            }
-                            else if (b2_succ == b1 && b1_pred == b2) // b2_pred -> b2 -> b1 -> b1_succ
-                            {
-                                b1.ReplaceChains(b2_pred, b2);
-                                b2.ReplaceChains(b1, b1_succ);
-
-                                b2_pred.ReplaceChains(b2_pred.predecessor, b1);
-                                b1_succ.ReplaceChains(b2, b1_succ.successor);
-                            }
-                            else
-                            {
-                                b1.ReplaceChains(b2, b2_succ);
-                                b2.ReplaceChains(b2_pred, b1);
-
-                                b2_succ.ReplaceChains(b1, b2_succ.successor);
-                                b1_pred.ReplaceChains(b1_pred.predecessor, b1_succ);
-                                b1_succ.ReplaceChains(b1_pred, b1_succ.successor);
-                            }
-
-                            score += increment;
-                        }
+                        score += increment;
                     }
+                    
                 }
 
             }
         }
-        //void shiftBetween()
-        //{
-        //    int dagkey1 = rnd.Next(0, 5);
-        //    int truckkey1 = rnd.Next(0, 2);
-        //    Dag d1 = trucksEnRoutes[truckkey1][dagkey1];
-        //    int dagkey2 = rnd.Next(0, 5);
-        //    int truckkey2 = rnd.Next(0, 2);
-        //    Dag d2 = trucksEnRoutes[truckkey2][dagkey2];
+        void shiftBetween()
+        {
+            int dagkey1 = rnd.Next(0, 5);
+            int truckkey1 = rnd.Next(0, 2);
+            Dag d1 = trucksEnRoutes[truckkey1][dagkey1];
+            int dagkey2 = rnd.Next(0, 5);
+            int truckkey2 = rnd.Next(0, 2);
+            Dag d2 = trucksEnRoutes[truckkey2][dagkey2];
 
-        //    int routeKey1 = rnd.Next(d1.routes.Count);
-        //    int routeKey2 = rnd.Next(d2.routes.Count);
-        //    Route r1 = d1.routes[routeKey1];
-        //    Route r2 = d2.routes[routeKey2];
+            int routeKey1 = rnd.Next(d1.routes.Count);
+            int routeKey2 = rnd.Next(d2.routes.Count);
+            Route r1 = d1.routes[routeKey1];
+            Route r2 = d2.routes[routeKey2];
 
-        //    if (routeKey1 != routeKey2)
-        //    {
-        //        int ind1 = rnd.Next(r1.route[0].Count);
-        //        int ind2 = rnd.Next(r2.route[0].Count);
-        //        Bedrijf b1 = r1.route[0][ind1];
-        //        Bedrijf npred = r2.route[0][ind2]; // new predecessor
+            if (routeKey1 != routeKey2)
+            {
+                int ind1 = rnd.Next(r1.route.Count);
+                int ind2 = rnd.Next(r2.route.Count);
+                Bedrijf b1 = r1.route[ind1];
+                Bedrijf npred = r2.route[ind2]; // new predecessor
 
-        //        Bedrijf b1_pred = b1.predecessor;
-        //        Bedrijf b1_succ = b1.successor;
+                Bedrijf b1_pred = b1.predecessor;
+                Bedrijf b1_succ = b1.successor;
 
-        //        Bedrijf npred_pred = npred.predecessor;
-        //        Bedrijf npred_succ = npred.successor;
+                Bedrijf npred_pred = npred.predecessor;
+                Bedrijf npred_succ = npred.successor;
 
-        //        // hou rekening met frequenties
-        //        if (ind1 != ind2 && b1_pred != null && b1_succ != null && npred_pred != null && npred_succ != null)
-        //        {
-        //            // kan nooit neighbors zijn
-        //            float tijdDelta1 = -rijtijd(b1, b1_pred) - rijtijd(b1_succ, b1) - b1.ldm; // voor dag 1
-        //            float tijdDelta2 = rijtijd(b1, npred) + rijtijd(npred_succ, b1) + rijtijd(b1_succ, b1_pred) - rijtijd(npred_succ, npred) + b1.ldm; // voor dag 2
+                // hou rekening met frequenties
+                if (ind1 != ind2 && b1_pred != null && b1_succ != null && npred_pred != null && npred_succ != null)
+                {
+                    // kan nooit neighbors zijn
+                    float tijdDelta1 = -rijtijd(b1, b1_pred) - rijtijd(b1_succ, b1) - b1.ldm; // voor dag 1
+                    float tijdDelta2 = rijtijd(b1, npred) + rijtijd(npred_succ, b1) + rijtijd(b1_succ, b1_pred) - rijtijd(npred_succ, npred) + b1.ldm; // voor dag 2
 
-        //            float capDelta1 = -b1.vpc * b1.cont;
-        //            float capDelta2 = b1.vpc * b1.cont;
+                    float capDelta1 = -b1.vpc * b1.cont;
+                    float capDelta2 = b1.vpc * b1.cont;
 
-        //            increment = tijdDelta1 + tijdDelta2;
+                    increment = tijdDelta1 + tijdDelta2;
 
-        //            // check constraints
-        //            if (d1.tijdsduur + tijdDelta1 < 12 * 60 && d2.tijdsduur + tijdDelta2 < 12 * 60 && r1.capaciteit + capDelta1 < 100000 && r2.capaciteit + capDelta2 < 100000 && acceptIncrement())
-        //            {
-        //                // verander chains
-        //                d1.tijdsduur += tijdDelta1;
-        //                d2.tijdsduur += tijdDelta2;
-        //                r1.capaciteit += capDelta1;
-        //                r2.capaciteit += capDelta2;
+                    // check constraints
+                    if (d1.tijdsduur + tijdDelta1 < 12 * 60 && d2.tijdsduur + tijdDelta2 < 12 * 60 && r1.capaciteit + capDelta1 < 100000 && r2.capaciteit + capDelta2 < 100000 && acceptIncrement())
+                    {
+                        // verander chains
+                        d1.tijdsduur += tijdDelta1;
+                        d2.tijdsduur += tijdDelta2;
+                        r1.capaciteit += capDelta1;
+                        r2.capaciteit += capDelta2;
 
-        //                b1_pred.ReplaceChains(b1_pred.predecessor, b1_succ);
-        //                b1_succ.ReplaceChains(b1_pred, b1_succ.successor);
-        //                npred.ReplaceChains(npred_pred, b1);
-        //                npred_succ.ReplaceChains(b1, npred_succ.successor);
-        //                r1.route[0].Remove(b1);
-        //                r2.route[0].Add(b1);
-        //            }
-        //        }
-        //    }
-        //}
+                        b1_pred.ReplaceChains(b1_pred.predecessor, b1_succ);
+                        b1_succ.ReplaceChains(b1_pred, b1_succ.successor);
+                        npred.ReplaceChains(npred_pred, b1);
+                        npred_succ.ReplaceChains(b1, npred_succ.successor);
+                        r1.route.Remove(b1);
+                        r2.route.Add(b1);
+                    }
+                }
+            }
+        }
+
+        void shiftBetween2()
+        {
+            int dagkey1 = rnd.Next(0, 5);
+            int truckkey1 = rnd.Next(0, 2);
+            Dag d1 = trucksEnRoutes[truckkey1][dagkey1];
+            int dagkey2 = rnd.Next(0, 5);
+            int truckkey2 = rnd.Next(0, 2);
+            Dag d2 = trucksEnRoutes[truckkey2][dagkey2];
+
+            int routeKey1 = rnd.Next(d1.routes.Count);
+            int routeKey2 = rnd.Next(d2.routes.Count);
+            Route r1 = d1.routes[routeKey1];
+            Route r2 = d2.routes[routeKey2];
+
+            if (routeKey1 != routeKey2 && r1.route.Count > 2)
+            {
+                int ind1 = rnd.Next(2, r1.route.Count);
+                int ind2 = rnd.Next(1, r2.route.Count);
+                Bedrijf b1 = r1.route[ind1];
+                Bedrijf newSucc = r2.route[ind2]; // new successor
+
+                Bedrijf b1_pred = b1.predecessor;
+                Bedrijf b1_succ = b1.successor;
+
+                Bedrijf newSucc_pred = newSucc.predecessor;
+
+                // kan nooit neighbors zijn
+                float tijdDelta1 = -rijtijd(b1, b1_pred) - rijtijd(b1_succ, b1) - b1.ldm + rijtijd(b1_succ, b1_pred); // voor dag 1
+                float tijdDelta2 = rijtijd(b1, newSucc_pred) + rijtijd(newSucc, b1) - rijtijd(newSucc, newSucc_pred) + b1.ldm; // voor dag 2
+
+                float capDelta1 = -b1.vpc * b1.cont;
+                float capDelta2 = b1.vpc * b1.cont;
+                if (r1.route.Count == 3)
+                {
+                    tijdDelta1 += -30;
+                }
+                if (r2.route.Count == 2)
+                {
+                    tijdDelta2 += 30;
+                }
+
+                increment = tijdDelta1 + tijdDelta2;
+
+                // check constraints
+                if (d1.tijdsduur + tijdDelta1 < 12 * 60 && d2.tijdsduur + tijdDelta2 < 12 * 60 && r1.capaciteit + capDelta1 < 100000 && r2.capaciteit + capDelta2 < 100000 && acceptIncrement())
+                {
+                    // verander chains
+                    d1.tijdsduur += tijdDelta1;
+                    d2.tijdsduur += tijdDelta2;
+                    r1.capaciteit += capDelta1;
+                    r2.capaciteit += capDelta2;
+                    newSucc.ReplaceChains(b1, newSucc.successor);
+                    newSucc_pred.ReplaceChains(newSucc_pred.predecessor, b1);
+
+                    b1.ReplaceChains(newSucc_pred, newSucc);
+                    b1_pred.ReplaceChains(b1_pred.predecessor, b1_succ);
+                    b1_succ.ReplaceChains(b1_pred, b1_succ.successor);
+
+
+                    r1.route.Remove(b1);
+                    r2.route.Add(b1);
+                }
+
+            }
+        }
 
         float rijtijd(Bedrijf b, Bedrijf pred)
         {
