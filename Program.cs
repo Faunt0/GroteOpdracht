@@ -30,7 +30,7 @@ namespace GroteOpdracht
             }
 
 
-            Dictionary<(int, int), float> fileDict = new Dictionary<(int, int), float>(); // maak lijst van
+            float[,] fileDict = new float[1099,1099]; // maak lijst van
             using (var reader = new StreamReader("../../../afstandenmatrix.txt"))
             {
                 string firstline = reader.ReadLine();
@@ -41,7 +41,7 @@ namespace GroteOpdracht
                     int id1 = int.Parse(parts[0]);
                     int id2 = int.Parse(parts[1]);
                     float tijd = float.Parse(parts[3]) / 60f; // is in seconden maar de rest niet
-                    fileDict[(id1, id2)] = tijd;
+                    fileDict[id1, id2] = tijd;
                 }
             }
 
@@ -232,7 +232,7 @@ namespace GroteOpdracht
     }
     public class Oplossing
     {
-        public Dictionary<(int, int), float> distDict;
+        public float[,] distDict;
         public Dag[][] trucksEnRoutes;
         public (float, Dag[][]) beste;
         public List<Bedrijf>? grabbelton;
@@ -246,11 +246,11 @@ namespace GroteOpdracht
         public int Q = 2000000;
         public float alpha;
         public Random rnd;
-        public Oplossing(Dictionary<(int, int), float> dictInput, Random rndIn)
+        public Oplossing(float[,] dictInput, Random rndIn)
         {
 
             stort = ["0", "-", "0", "0", "0", "0", "287"];
-            trucksEnRoutes = [[new Dag(stort), new Dag(stort), new Dag(stort), new Dag(stort), new Dag(stort)], [new Dag(stort), new Dag(stort), new Dag(stort), new Dag(stort), new Dag(stort)]];
+            trucksEnRoutes = [[new Dag(stort, 2), new Dag(stort), new Dag(stort), new Dag(stort, 2), new Dag(stort)], [new Dag(stort, 2), new Dag(stort), new Dag(stort), new Dag(stort, 2), new Dag(stort)]];
             distDict = dictInput;
             alpha = 0.99F;
             rnd = rndIn;
@@ -312,16 +312,17 @@ namespace GroteOpdracht
                 float oldscore = score;
                 int op = rnd.Next(100);
 
-                if      (0 <= op && op < 40) { swapWithinDay(); }
-                else if (40 <= op && op < 80) { swapBetweenDays(); }
+                //if      (0 <= op && op < 40) { swapWithinDay(); }
+                //else if (40 <= op && op < 80) { swapBetweenDays(); }
                 //else if (80 <= op && op < 85) { replaceStop(); }
                 //else if (85 <= op && op < 88) { removeStop(); }
                 //else if (88 <= op && op < 92) { addRoute(); }
-                else if (92 <= op && op < 100) { addOperation(); }
-                else
-                {
-                    swapBetweenDays();
-                }
+                addOperation();
+                //if (92 <= op && op < 100) { addOperation(); }
+                //else
+                //{
+                //    //swapBetweenDays();
+                //}
 
                 if (oldscore == score)
                 {
@@ -819,7 +820,7 @@ namespace GroteOpdracht
         
         float rijtijd(Bedrijf b, Bedrijf pred)
         {
-            return distDict[(pred.matrixID, b.matrixID)];
+            return distDict[pred.matrixID, b.matrixID];
         }
 
     }
@@ -909,10 +910,13 @@ namespace GroteOpdracht
     {
         public float tijdsduur; // in minuten
         public List<Route> routes;
-        public Dag(string[] stort)
+        public Dag(string[] stort, int numRoute=1)
         {
             routes = new List<Route>();
-            routes.Add(new Route(stort));
+            for (int i = 0; i < numRoute; i++)
+            {
+                routes.Add(new Route(stort));
+            }
             tijdsduur = 0;
         }
     }
