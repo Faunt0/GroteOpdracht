@@ -205,7 +205,7 @@ namespace GroteOpdracht
                     Console.WriteLine("Name the save file:\t");
                     string fileName = Console.ReadLine();
                     StreamWriter sw = new StreamWriter($"./oplossingen/{fileName}.txt");
-                    foreach (string line in lines)
+                    foreach (string line in oplossing.beste.Item2)
                     {
                         sw.WriteLine(line);
                     }
@@ -220,9 +220,10 @@ namespace GroteOpdracht
                 // gebruik de tot nu toe beste oplossing opnieuw
                 else if (save == "5")
                 {
-                    oplossing.trucksEnRoutes = oplossing.beste.Item2;
-                    oplossing.tellertje = 0;
-                    oplossing.T = 30;
+                    throw new Exception("This does not work properly, seeing as the best solution is in text format and the way to convert this into a usable format has yet to be properly implemented");
+                    //oplossing.trucksEnRoutes = oplossing.beste.Item2;
+                    //oplossing.tellertje = 0;
+                    //oplossing.T = 30;
                 }
                 else
                 {
@@ -242,8 +243,8 @@ namespace GroteOpdracht
         public float score;
         public int plateauCount;
         public float increment;
-        public long iterations = 1000000000;
-        public float T = 30;
+        public long iterations = 100000000;
+        public float T = 12;
         public int Q = 2000000;
         public float alpha;
         public Random rnd;
@@ -256,7 +257,8 @@ namespace GroteOpdracht
             alpha = 0.99F;
             rnd = rndIn;
             plateauCount = 0;
-            beste = (1000000, trucksEnRoutes);
+            List<string> first = makeString(trucksEnRoutes);
+            beste = (1000000, first);
         }
 
         public void beginScore()
@@ -305,7 +307,24 @@ namespace GroteOpdracht
             }
             return b.ldm +  rijtijd(b.successor, b) + recurseRoute(b.successor);
         }
-
+        public List<string> makeString(Dag[][] trucksenroute)
+        {
+            List<string> res = new List<string>();
+            // loop door trucks
+            for (int i = 0; i < 2; i++)
+            {
+                // loop door dagen
+                for (int j = 0; j < 5; j++)
+                {
+                    List<string> routeString = trucksenroute[i][j].makeString();
+                    foreach (string s in routeString)
+                    {
+                        res.Add($"{i + 1}; {j + 1}; {s}");
+                    }
+                }
+            }
+            return res;
+        }
         public void ILS()
         {
             while (tellertje < iterations && T > 0.00005F)
@@ -316,25 +335,20 @@ namespace GroteOpdracht
                 //if      (0 <= op && op < 40) { swapWithinDay(); }
                 //else if (40 <= op && op < 80) { swapBetweenDays(); }
                 //else if (80 <= op && op < 85) { replaceStop(); }
-                //else if (85 <= op && op < 88) { removeStop(); }
+                if (0 <= op && op < 2 && false) { removeStop(); }
                 //else if (88 <= op && op < 92) { addRoute(); }
                 //addOperation();
-                if (60 <= op && op < 100) { addOperation(); }
-                else if (30 <= op && op < 50) { shiftBetween2(); }
+                else if (90 <= op && op < 100) { addOperation(); }
+                else if (30 <= op && op < 70) { shiftBetween2(); }
                 else
                 {
                     shiftWithin();
                 }
 
-                if (oldscore == score)
-                {
-                    plateauCount++;
-                }
 
-                if (score < beste.Item1)
-                {
-                    beste = (score, trucksEnRoutes);
-                }
+                if (oldscore == score) { plateauCount++; } else { plateauCount = 0; }
+
+                if (score < beste.Item1) { beste = (score, makeString(trucksEnRoutes)); }
 
                 tellertje++;
 
@@ -736,10 +750,10 @@ namespace GroteOpdracht
                     float tijdDelta = b.ldm + rijtijd(b, predecessor) + rijtijd(successor, b) - rijtijd(successor, predecessor);
 
                     // stel we voegen een bedrijf toe aan een lege route moeten we nog legen bij de stort
-                    //if (r.route.Count == 2)
-                    //{
-                    //    tijdDelta += 30;
-                    //}
+                    if (r.route.Count == 2)
+                    {
+                        tijdDelta += 30;
+                    }
                     increment = -(b.ldm * 3) + tijdDelta;
 
                     // als de increment geaccepteerd worde en er wordt voldaan aan de eisen
@@ -859,15 +873,16 @@ namespace GroteOpdracht
 
                     // bereken de increment op basis van de neighbours
                     float tijdDelta;
-                    // ns_pred -> newSucc -> b1 -> b1_succ
+                    tijdDelta = -rijtijd(b1_succ, b1) - rijtijd(b1, b1_pred) - rijtijd(newSucc, ns_pred) + rijtijd(b1, ns_pred) + rijtijd(newSucc, b1);
+                    // ns_pred -> newSucc -> b1 -> b1_succ // dit is de enige case die we hoeven te overwegen
                     if (b1_pred == newSucc)
                     {
-                        tijdDelta = -rijtijd(b1_succ, b1) - rijtijd(b1, b1_pred) - rijtijd(newSucc, ns_pred) + rijtijd(b1, ns_pred) + rijtijd(newSucc, b1) + rijtijd(b1_succ, newSucc);
+                        tijdDelta += rijtijd(b1_succ, newSucc);
                     }
                     else
                     {
                         // als ze geen neighbours van elkaar zijn doe dit.
-                        tijdDelta = -rijtijd(b1, b1_pred) - rijtijd(b1_succ, b1) - rijtijd(newSucc, ns_pred) + rijtijd(newSucc, b1) + rijtijd(b1, ns_pred) + rijtijd(b1_succ, b1_pred);
+                        tijdDelta += rijtijd(b1_succ, b1_pred);
                     }
 
                     increment = tijdDelta;
@@ -988,21 +1003,22 @@ namespace GroteOpdracht
                 Bedrijf newSucc_pred = newSucc.predecessor;
 
                 // kan nooit neighbors zijn
-                float tijdDelta1 = -rijtijd(b1, b1_pred) - rijtijd(b1_succ, b1) - b1.ldm + rijtijd(b1_succ, b1_pred); // voor dag 1
-                float tijdDelta2 = rijtijd(b1, newSucc_pred) + rijtijd(newSucc, b1) - rijtijd(newSucc, newSucc_pred) + b1.ldm; // voor dag 2
+                float tijdDelta1 = -rijtijd(b1, b1_pred) - rijtijd(b1_succ, b1) + rijtijd(b1_succ, b1_pred) - b1.ldm; // voor dag 1
+                float tijdDelta2 = -rijtijd(newSucc, newSucc_pred) + rijtijd(b1, newSucc_pred) + rijtijd(newSucc, b1) + b1.ldm; // voor dag 2
 
                 float capDelta1 = -b1.vpc * b1.cont;
                 float capDelta2 = b1.vpc * b1.cont;
-                //if (r1.route.Count == 3)
-                //{
-                //    tijdDelta1 += -30;
-                //}
-                //if (r2.route.Count == 2)
-                //{
-                //    tijdDelta2 += 30;
-                //}
+                if (r1.route.Count == 3)
+                {
+                    tijdDelta1 -= 30;
+                }
+                if (r2.route.Count == 2)
+                {
+                    tijdDelta2 += 30;
+                }
 
                 increment = tijdDelta1 + tijdDelta2;
+
 
                 // check constraints
                 if (d1.tijdsduur + tijdDelta1 < 12 * 60 && d2.tijdsduur + tijdDelta2 < 12 * 60 && r1.capaciteit + capDelta1 < 100000 && r2.capaciteit + capDelta2 < 100000 && acceptIncrement())
@@ -1126,7 +1142,7 @@ namespace GroteOpdracht
             {
                 routes.Add(new Route(stort));
             }
-            tijdsduur = 30 * numRoute;
+            tijdsduur = 0;
         }
         public List<string> makeString()
         {
