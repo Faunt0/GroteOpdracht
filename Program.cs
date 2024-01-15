@@ -175,32 +175,32 @@ namespace GroteOpdracht
                 }
                 else if (save == "0") // alleen de beste oplossing saven
                 {
-                    List<string> lines = new List<string>();
+                    //List<string> lines = new List<string>();
 
-                    for (int t = 0; t < 2; t++)
-                    {
-                        for (int d = 0; d < 5; d++)
-                        {
-                            List<Route> routes = oplossing.beste.Item2[t][d].routes;
+                    //for (int t = 0; t < 2; t++)
+                    //{
+                    //    for (int d = 0; d < 5; d++)
+                    //    {
+                    //        List<Route> routes = oplossing.beste.Item2[t][d].routes;
 
-                            int index = 0;
-                            List<string> strings = new List<string>();
-                            foreach (Route r in routes)
-                            {
-                                List<string> res = r.makeString(r.route[0], index);
-                                res.Reverse();
-                                foreach (string s in res) { strings.Add(s); }
+                    //        int index = 0;
+                    //        List<string> strings = new List<string>();
+                    //        foreach (Route r in routes)
+                    //        {
+                    //            List<string> res = r.makeString(r.route[0], index);
+                    //            res.Reverse();
+                    //            foreach (string s in res) { strings.Add(s); }
 
-                                index += res.Count;
-                            }
+                    //            index += res.Count;
+                    //        }
 
-                            foreach (string s in strings)
-                            {
-                                //Console.WriteLine($"{t}; {d}; " + s);
-                                lines.Add($"{t + 1}; {d + 1}; " + s);
-                            }
-                        }
-                    }
+                    //        foreach (string s in strings)
+                    //        {
+                    //            //Console.WriteLine($"{t}; {d}; " + s);
+                    //            lines.Add($"{t + 1}; {d + 1}; " + s);
+                    //        }
+                    //    }
+                    //}
                     Console.WriteLine("Name the save file:\t");
                     string fileName = Console.ReadLine();
                     StreamWriter sw = new StreamWriter($"./oplossingen/{fileName}.txt");
