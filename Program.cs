@@ -58,7 +58,8 @@ namespace GroteOpdracht
                 Console.WriteLine("Which file:");
                 string filepath = "./oplossingen/";
                 DirectoryInfo d = new DirectoryInfo(filepath);
-
+                
+                // print all files to choose from
                 List<string> files = new List<string>();
                 int index = 0;
                 foreach (var file in d.GetFiles("*.txt"))
@@ -83,6 +84,7 @@ namespace GroteOpdracht
                         {
                             r.maakLinkedList();
                             dag.routes.Add(r);
+                            dag.tijdsduur += 30;
 
                             r = new Route(oplossing.stort);
                             r.capaciteit = 0;
@@ -269,6 +271,7 @@ namespace GroteOpdracht
             {
                 grabbeltonKosten += b.ldm * 3 * b.freq;
             }
+
             for (int truck = 0; truck < 2; truck++)
             {
                 for (int i = 0; i < 5; i++)
