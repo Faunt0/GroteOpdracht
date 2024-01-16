@@ -11,7 +11,7 @@ namespace GroteOpdracht
 
         static void Main()
         {
-            // bedrijvenlijst:
+            // grabbelton:
             Dictionary<int, Bedrijf> grabbelton = new Dictionary<int, Bedrijf>();
             using (var reader = new StreamReader("../../../orderbestand.txt"))
             {
@@ -245,7 +245,7 @@ namespace GroteOpdracht
         public float score;
         public int plateauCount;
         public float increment;
-        public long iterations = 100000000;
+        public long iterations = 10000000;
         public float T = 12;
         public int Q = 2000000;
         public float alpha;
@@ -339,8 +339,7 @@ namespace GroteOpdracht
                 //else if (40 <= op && op < 80) { swapBetweenDays(); }
                 //else if (80 <= op && op < 85) { replaceStop(); }
                 if (0 <= op && op < 2 && false) { removeStop(); }
-                //else if (88 <= op && op < 92) { addRoute(); }
-                //addOperation();
+                else if (85 <= op && op < 90) { addMultiple(); }
                 else if (90 <= op && op < 100) { addOperation(); }
                 else if (30 <= op && op < 70 && false) { shiftBetween2(); }
                 else
@@ -753,10 +752,7 @@ namespace GroteOpdracht
                     float tijdDelta = b.ldm + rijtijd(b, predecessor) + rijtijd(successor, b) - rijtijd(successor, predecessor);
 
                     // stel we voegen een bedrijf toe aan een lege route moeten we nog legen bij de stort
-                    if (r.route.Count == 2)
-                    {
-                        tijdDelta += 30;
-                    }
+                    if (r.route.Count == 2) { tijdDelta += 30; }
                     increment = -(b.ldm * 3) + tijdDelta;
 
                     // als de increment geaccepteerd worde en er wordt voldaan aan de eisen
@@ -784,55 +780,79 @@ namespace GroteOpdracht
         {
             if (grabbelton.Count > 0)
             {
-                int key = rnd.Next(0, grabbelton.Count);
+                int truckkey = rnd.Next(0, 2); // needs to be different
+                int key = rnd.Next(grabbelton.Count);
                 Bedrijf b = grabbelton[key];
-                int[][] dagen = [[0], [0, 3], [0, 2, 4], [0, 1, 2, 3]];
-                int randomness = 0;
+                int[][] freq2dagen = [[0, 3], [1, 4]]; // alleen voor freq == 2
+                int[] freq3dagen = [0, 2, 4];
+                int[][] freq4dagen = [[0, 1, 2, 3], [1, 2, 3, 4], [0, 2, 3, 4], [0, 1, 3, 4], [0, 1, 2, 4]];
 
+
+                increment = 0;
+
+                int[] dagIndexen = new int[5];
+                if (b.freq == 2) { dagIndexen = freq2dagen[rnd.Next(0, b.freq)]; }
+                else if (b.freq == 3) { dagIndexen = freq3dagen; }
+                else if (b.freq == 4) { dagIndexen = freq4dagen[rnd.Next(5)]; }
+
+                int[] routeIndexen = new int[5];
+                float[] tijdDeltas = new float[5];
+                float[] capDeltas = new float[5];
+                (Bedrijf, Bedrijf)[] predsucc = new (Bedrijf, Bedrijf)[5];
                 bool constraints = true;
-                List<float> tijdDeltas = new List<float>();
-                List<float> capDeltas = new List<float>();
-                List<(Bedrijf, Bedrijf)> predsucc = new List<(Bedrijf, Bedrijf)>();
-                List<Dag> dagenlijst = new List<Dag>();
-                List<Route> routes = new List<Route>();
-
-                for (int i = 0; i < b.freq; i++)
+                // voor willekeurige trucks en routes voeg toe aan die dag
+                foreach (int i in dagIndexen)
                 {
-                    int truckkey = rnd.Next(0, 2);
-                    Dag dag = trucksEnRoutes[truckkey][dagen[b.freq][i]]; // get the day, truck can be random
-                    Route r = dag.routes[rnd.Next(dag.routes.Count)];
+                    Dag d = trucksEnRoutes[truckkey][i];
+                    int routeKey = rnd.Next(d.routes.Count);
+                    Route r = d.routes[routeKey];
+                    Bedrijf succ = r.route[rnd.Next(1, r.route.Count)]; // laatste stort is mogelijke successor
+                    Bedrijf ns_pred = succ.predecessor;
 
-                    Bedrijf predecessor = r.route[rnd.Next(r.route.Count)]; // grab a random element from the route as the predecessor
-                    Bedrijf successor = predecessor.successor; // grab a random element from the route as the predecessor
+                    float tijdDelta;
+                    tijdDelta = -rijtijd(succ, ns_pred) + rijtijd(b, ns_pred) + rijtijd(succ, b) + b.ldm;
+                    //if (r.route.Count == 2) { tijdDelta += 30; }
+                    if (d.tijdsduur + tijdDelta < 12 * 60) { tijdDeltas[i] = tijdDelta; } else { constraints = false; break; }
 
-                    if (successor != null)
-                    {
-                        float capDelta = b.vpc * b.cont;
-                        float tijdDelta = b.ldm + rijtijd(b, predecessor) + rijtijd(successor, b) - rijtijd(successor, predecessor);
+                    float capDelta;
+                    capDelta = b.vpc * b.cont;
+                    if (r.capaciteit + capDelta < 100000) { capDeltas[i] = capDelta; } else { constraints = false; break; }
 
-                        // hou een boolean bij die zegt of er voor elke dag aan de constraints voldaan wordt. 
-                        constraints = constraints && (r.capaciteit + capDelta <= 100000) && (dag.tijdsduur + tijdDelta < 12 * 60);
-                        capDeltas.Add(capDelta);
-                        tijdDeltas.Add(tijdDelta);
-                        predsucc.Add((predecessor, successor));
-
-                        dagenlijst.Add(dag);
-                        routes.Add(r);
-                    }
+                    predsucc[i] = (ns_pred, succ);
+                    routeIndexen[i] = routeKey;
                 }
 
-                increment = -(b.ldm * 3) + tijdDeltas.Sum(); // hou hier geen rekening met de frequentie
-
-                if (acceptIncrement() && constraints)
+                if (constraints)
                 {
-                    for (int i = 0; i < b.freq; i++)
-                    {
-                        dagenlijst[i].tijdsduur += tijdDeltas[i];
-                        routes[i].capaciteit += capDeltas[i];
+                    increment = tijdDeltas.Sum() - (b.ldm * 3 * b.freq);
 
-                        Bedrijf bclone = new Bedrijf(b.inputArray);
+                    if (acceptIncrement())
+                    {
+                        foreach (int dagkey in dagIndexen)
+                        {
+                            Bedrijf b_clone = new Bedrijf(b.inputArray);
+                            b_clone.dagkey = dagkey;
+
+                            Dag d = trucksEnRoutes[truckkey][dagkey];
+                            Route r = d.routes[routeIndexen[dagkey]];
+                            if (r.route.Count == 2) { d.tijdsduur += 30; }
+
+                            Bedrijf succ = predsucc[dagkey].Item2;
+                            Bedrijf ns_pred = predsucc[dagkey].Item1;
+
+                            d.tijdsduur += tijdDeltas[dagkey];
+                            r.capaciteit += capDeltas[dagkey];
+
+                            b_clone.ReplaceChains(ns_pred, succ);
+                            succ.ReplaceChains(b_clone, succ.successor);
+                            ns_pred.ReplaceChains(ns_pred.predecessor, b_clone);
+
+                            r.route.Add(b_clone);
+                        }
+
+                        score += increment;
+                        grabbelton.Remove(b);
                     }
-                    score += increment;
                 }
             }
         }
@@ -843,20 +863,6 @@ namespace GroteOpdracht
             Dag d = trucksEnRoutes[truck][dag];
             int route = rnd.Next(d.routes.Count); // pak een willekeurige route van een dag
             Route r = d.routes[route];
-
-
-
-            //if (r.route[0].Count > 2) // denk niet dat dit nodig is.
-            //{
-            //    int ind1 = rnd.Next(r.route[0].Count);
-            //    int ind2 = rnd.Next(r.route[0].Count);
-            //    int freqin1 = rnd.Next(4);
-            //    int freqin2 = rnd.Next(4);
-            //    if (ind1 != ind2 && r.route[freqin1].Count > 0 && r.route[freqin2].Count > 0)
-            //    {
-            //        // can shift within a route regardless of frequencie
-            //        Bedrijf b1 = r.route[freqin1][ind1];
-            //        Bedrijf b2 = r.route[freqin2][ind2]; // new predecessor
 
             if (r.route.Count > 2) // denk niet dat dit nodig is.
             {
@@ -1098,13 +1104,24 @@ namespace GroteOpdracht
         // dit is een recursieve functie bedoelt om de route uit te lezen en er een lijst van strings van te maken die te gebruiken valt in de checker
         public List<string> makeString(Bedrijf b, int place)
         {
+            //checkCycle(b, new List<int>());
             if (b.successor == null) { return [$"{place}; 0"]; }
 
             List<string> res = makeString(b.successor, place + 1);
             if (b.predecessor == null) { return res; }
             res.Add($"{place}; {b.order}");
             return res;
-        } 
+        }
+        public bool checkCycle(Bedrijf b, List<int> visited)
+        {
+            if (b.successor == null) { return false; }
+            if (visited.Contains(b.matrixID) && b.matrixID != 287) 
+            {
+                throw new Exception("There has been found a cycle!");
+            }
+            visited.Add(b.matrixID);
+            return checkCycle(b.successor, visited);
+        }
     }
     public class Bedrijf
     {
@@ -1116,6 +1133,7 @@ namespace GroteOpdracht
         public int vpc;
         public float ldm;
         public int matrixID;
+        public int dagkey;
         public string[] inputArray;
         public Bedrijf(string[] parts)
         {
