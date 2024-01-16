@@ -342,7 +342,7 @@ namespace GroteOpdracht
                 //else if (88 <= op && op < 92) { addRoute(); }
                 //addOperation();
                 else if (90 <= op && op < 100) { addOperation(); }
-                else if (30 <= op && op < 70) { shiftBetween2(); }
+                else if (30 <= op && op < 70 && false) { shiftBetween2(); }
                 else
                 {
                     shiftWithin();
