@@ -77,6 +77,7 @@ namespace GroteOpdracht
                 {
                     // maak de routes
                     Route r = new Route(oplossing.stort);
+                    List<Bedrijf> bedrijven = new List<Bedrijf>();
                     List<int> f234Orders = new List<int>();
 
                     string line;
@@ -87,7 +88,10 @@ namespace GroteOpdracht
 
                         if (int.Parse(parts[3]) == 0)
                         {
-                            //r.route.Reverse();
+                            bedrijven.Reverse();
+                            //foreach (Bedr)
+
+                            // reverse de lijst van bedrijven en voeg deze toe aan de route om de juiste volgorde te krijgen uit het bestand waar de volgorde omgekeert staat.
                             r.maakLinkedList();
                             dag.routes.Add(r);
                             dag.tijdsduur += 30;
