@@ -19,7 +19,6 @@ namespace GroteOpdracht
                 string firstline = reader.ReadLine();
                 //Console.WriteLine($"{firstline}");
 
-                int index = 0;
                 string line;
                 while ((line = reader.ReadLine()) != null)
                 {
@@ -62,22 +61,33 @@ namespace GroteOpdracht
                 Console.WriteLine("Which file:");
                 string filepath = "./oplossingen/";
                 DirectoryInfo d = new DirectoryInfo(filepath);
-                // print all files to choose from
                 List<string> files = new List<string>();
                 int index = 0;
                 foreach (var file in d.GetFiles("*.txt"))
                 {
+                    // print the possible files in the folder
                     Console.WriteLine($"\t{index}.\t{file.Name}");
                     index++;
                     files.Add(file.FullName);
                 }
 
+
+
+                // read the file that has been chosen
                 string fileI = Console.ReadLine();
                 using (var reader = new StreamReader(files[int.Parse(fileI)]))
                 {
                     // maak de routes
-                    Route r = new Route(oplossing.stort);
-                    List<Bedrijf> bedrijven = new List<Bedrijf>();
+                    List<(int, int)>[,] t_and_d = new List<(int, int)>[2, 5];
+                    for (int t = 0; t < 2; t++)
+                    {
+                        for (int dk = 0; dk < 5; dk++)
+                        {
+                            t_and_d[t, dk] = new List<(int, int)>();
+                        }
+                    }
+
+                            List<Bedrijf> bedrijven = new List<Bedrijf>();
                     List<int> f234Orders = new List<int>();
 
                     string line;
@@ -86,35 +96,56 @@ namespace GroteOpdracht
                         string[] parts = line.Replace(" ", "").Split(";");
                         Dag dag = oplossing.trucksEnRoutes[int.Parse(parts[0]) - 1][int.Parse(parts[1]) - 1];
 
-                        if (int.Parse(parts[3]) == 0)
-                        {
-                            bedrijven.Reverse();
-                            //foreach (Bedr)
+                        // save a tuple of the order sequence number and order number
+                        t_and_d[int.Parse(parts[0]) - 1, int.Parse(parts[1]) - 1].Add((int.Parse(parts[2]), int.Parse(parts[3])));
+                    }
+                    // na elke regel gelezen te hebben
 
-                            // reverse de lijst van bedrijven en voeg deze toe aan de route om de juiste volgorde te krijgen uit het bestand waar de volgorde omgekeert staat.
-                            r.maakLinkedList();
+
+                    for (int t = 0; t < 2; t++)
+                    {
+                        for (int dk = 0; dk < 5;  dk++)
+                        {
+                            Dag dag = oplossing.trucksEnRoutes[t][dk];
+                            dag.routes.Clear();
+
+                            Dictionary<int, int> kv = t_and_d[t, dk].ToDictionary(x => x.Item1, x => x.Item2);
+
+                            int r_index = 0;
+                            Route r = new Route(oplossing.stort);
                             dag.routes.Add(r);
-                            dag.tijdsduur += 30;
-
-                            r = new Route(oplossing.stort);
-                            r.capaciteit = 0;
-                        }
-                        else
-                        {
-                            Bedrijf b = grabbelton.ContainsKey(int.Parse(parts[3])) ? grabbelton[int.Parse(parts[3])] : grabbeltonFreq234[int.Parse(parts[3])];
-                            if (b.freq == 1)
+                            for (int i = 1; i < kv.Count + 1; i++)
                             {
-                                grabbelton.Remove(b.order); // dit kan niet voor dingen die vaker voor moeten komen. maar wat doe je dan
-                            }
-                            else
-                            {
-                                // maak de bedrijven met freq>1 uniek in de route zodat ze unieke pred en succ hebben.
-                                b.dagkey = int.Parse(parts[1]);
-                                f234Orders.Add(b.order);
-                            }
+                                if (kv[i] == 0)
+                                {
+                                    // maak een nieuwe route aan
+                                    dag.routes[r_index].maakLinkedList();
+                                    if (i != kv.Count)
+                                    {
+                                        dag.routes.Add(new Route(oplossing.stort));
+                                        r_index++;
+                                    }
+                                }
+                                else if (i != kv.Count)
+                                {
+                                    Bedrijf b = grabbelton.ContainsKey(kv[i]) ? grabbelton[kv[i]] : grabbeltonFreq234[kv[i]];
+                                    if (b.freq == 1)
+                                    {
+                                        grabbelton.Remove(b.order); // dit kan niet voor dingen die vaker voor moeten komen. maar wat doe je dan
+                                        dag.routes[r_index].route.Add(b);
+                                    }
+                                    else
+                                    {
+                                        // maak de bedrijven met freq>1 uniek in de route zodat ze unieke pred en succ hebben.
+                                        Bedrijf b_clone = new Bedrijf(b.inputArray);
+                                        b_clone.dagkey = dk;
+                                        dag.routes[r_index].route.Add(b_clone);
+                                        f234Orders.Add(b.order);
+                                    }
 
-                            r.route.Add(b);
-                            r.capaciteit += b.cont * b.vpc;
+                                    dag.routes[r_index].capaciteit += b.cont * b.vpc;
+                                }
+                            }
                         }
                     }
 
@@ -186,7 +217,7 @@ namespace GroteOpdracht
                 else if (save == "4")
                 {
                     oplossing.tellertje = 0;
-                    oplossing.T = 12;
+                    oplossing.T = 2;
                 }
                 // gebruik de tot nu toe beste oplossing opnieuw
                 else if (save == "5")
@@ -215,9 +246,9 @@ namespace GroteOpdracht
         public double score;
         public int plateauCount;
         public double increment;
-        public long iterations = 4000000000;
-        public double T = 12;
-        public int Q = 5000000;
+        public long iterations = 4000000000; // 4 miljard duurt ~16 minuten
+        public double T = 3;
+        public int Q = 10000000;
         public double alpha;
         public Random rnd;
         public Oplossing(double[,] dictInput, Random rndIn)
@@ -258,16 +289,9 @@ namespace GroteOpdracht
                     {
                         if (r.route.Count > 2)
                         {
-                            
                             double routekosten = 30;
-                            foreach (Bedrijf b in r.route)
-                            {
-                                if (b.predecessor == null)
-                                {
-                                    routekosten += recurseRoute(b);
-                                    break;
-                                }
-                            }
+                            routekosten += recurseRoute(r.route[0]);
+
                             d.tijdsduur += routekosten;
                             travelTime += routekosten;
                         }
@@ -278,11 +302,22 @@ namespace GroteOpdracht
         }
         public double recurseRoute(Bedrijf b)
         {
+            bool dkjfkdjf = checkCycle(b, []);
             if (b.successor == null)
             {
                 return 0;
             }
             return b.ldm +  rijtijd(b.successor, b) + recurseRoute(b.successor);
+        }
+        public bool checkCycle(Bedrijf b, List<int> visited)
+        {
+            if (b.successor == null) { return false; }
+            if (visited.Contains(b.order) && b.order != 0)
+            {
+                throw new Exception("There has been found a cycle!");
+            }
+            visited.Add(b.order);
+            return checkCycle(b.successor, visited);
         }
         public List<string> makeString(Dag[][] trucksenroute)
         {
@@ -310,11 +345,12 @@ namespace GroteOpdracht
                 int op = rnd.Next(100);
 
                 // misschien todo: laat alle kansen afhangen van het aantal iteraties
-                if (0 <= op && op < 5 && false)          { removeStop(); }
-                else if (5 <= op && op < 10)    { addMultiple(); }
-                else if (10 <= op && op < 15)   { addOperation(); }
-                else if (20 <= op && op < 60)   { shiftBetween(); }
-                else if (60 <= op && op < 100)   { shiftWithin(); }
+                //addOperation();
+                if (op < 3) { removeStop(); }
+                else if (op < 8) { addMultiple(); }
+                else if (op < 13) { addOperation(); }
+                else if (op < 63) { shiftBetween(); }
+                else if (op < 100) { shiftWithin(); }
 
 
                 if (oldscore == score) { plateauCount++; } else { plateauCount = 0; }
@@ -335,7 +371,7 @@ namespace GroteOpdracht
             {
                 return true;
             }
-            if (Math.Exp((-increment) / T) < rnd.NextDouble())
+            if (Math.Exp((-increment) / T) > rnd.NextDouble())
             {
                 return true;
             }
@@ -730,11 +766,12 @@ namespace GroteOpdracht
                     succ = route[i + 1];
                 }
                 Bedrijf b = route[i];
+
                 pred.ReplaceChains(pred.predecessor, b);
                 succ.ReplaceChains(b, succ.successor);
                 b.ReplaceChains(pred, succ);
             }
-            bool xdafsfs = checkCycle(route[0], new List<int>());
+            //bool xdafsfs = checkCycle(route[0], new List<int>());
         }
         // dit is een recursieve functie bedoelt om de route uit te lezen en er een lijst van strings van te maken die te gebruiken valt in de checker
         public List<string> makeString(Bedrijf b, int place)
