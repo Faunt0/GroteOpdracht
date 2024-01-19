@@ -242,13 +242,13 @@ namespace GroteOpdracht
         public List<Bedrijf>? grabbelton;
         public List<Bedrijf>? grabbeltonFreq234;
         public string[] stort;
-        public int tellertje;
+        public long tellertje;
         public double score;
-        public int plateauCount;
+        public long plateauCount;
         public double increment;
-        public long iterations = 4000000000; // 4 miljard duurt ~16 minuten
+        public long iterations = 1000000000; // 4 miljard duurt ~16 minuten
         public double T = 3;
-        public int Q = 10000000;
+        public long Q = 10000000;
         public double alpha;
         public Random rnd;
         public Oplossing(double[,] dictInput, Random rndIn)
@@ -720,6 +720,10 @@ namespace GroteOpdracht
                 }
 
             }
+        }
+        void swapBetween()
+        {
+
         }
 
         double rijtijd(Bedrijf b, Bedrijf pred)
