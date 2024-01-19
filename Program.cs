@@ -247,7 +247,7 @@ namespace GroteOpdracht
         public long plateauCount;
         public double increment;
         public long iterations = 1000000000; // 4 miljard duurt ~16 minuten
-        public double T = 3;
+        public double T = 1;
         public long Q = 10000000;
         public double alpha;
         public Random rnd;
@@ -344,23 +344,43 @@ namespace GroteOpdracht
                 double oldscore = score;
                 int op = rnd.Next(100);
 
-                // misschien todo: laat alle kansen afhangen van het aantal iteraties
-                //addOperation();
-                if (op < 3) { removeStop(); }
-                else if (op < 8) { addMultiple(); }
-                else if (op < 13) { addOperation(); }
-                else if (op < 63) { shiftBetween(); }
-                else if (op < 100) { shiftWithin(); }
-
-
-                if (oldscore == score) { plateauCount++; } else { plateauCount = 0; }
-                if (score < beste.Item1) { beste = (score, makeString(trucksEnRoutes)); }
-
-                tellertje++;
-
-                if (tellertje % Q == 0)
+                if (plateauCount > 1000)
                 {
-                    T = T * alpha;
+                    // voer een random walk uit voor 100 iteraties dmv een verhoogde T waarde
+                    double old_T = T;
+                    T = T * 1.1;
+                    for (int rw = 0; rw < 100; rw++)
+                    {
+                        op = rnd.Next(100);
+                        if (op < 3) { removeStop(); }
+                        else if (op < 8) { addMultiple(); }
+                        else if (op < 13) { addOperation(); }
+                        else if (op < 75) { shiftBetween(); }
+                        else if (op < 100) { shiftWithin(); }
+                        tellertje++;
+                    }
+                    plateauCount = 0;
+                    T = old_T;
+                }
+                else
+                {
+                    // misschien todo: laat alle kansen afhangen van het aantal iteraties
+                    if (op < 3) { removeStop(); }
+                    else if (op < 8) { addMultiple(); }
+                    else if (op < 13) { addOperation(); }
+                    else if (op < 75) { shiftBetween(); }
+                    else if (op < 100) { shiftWithin(); }
+
+
+                    if (oldscore == score) { plateauCount++; } else { plateauCount = 0; }
+                    if (score < beste.Item1) { beste = (score, makeString(trucksEnRoutes)); }
+
+                    tellertje++;
+
+                    if (tellertje % Q == 0)
+                    {
+                        T = T * alpha;
+                    }
                 }
             }
         }
@@ -721,11 +741,7 @@ namespace GroteOpdracht
 
             }
         }
-        void swapBetween()
-        {
-
-        }
-
+        
         double rijtijd(Bedrijf b, Bedrijf pred)
         {
             return distDict[pred.matrixID, b.matrixID];
