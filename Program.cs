@@ -2,6 +2,7 @@
 using System;
 using System.IO;
 using System.Collections.Generic;
+using System.Threading;
 using System.Security.Cryptography;
 
 namespace GroteOpdracht
@@ -101,7 +102,7 @@ namespace GroteOpdracht
                     }
                     // na elke regel gelezen te hebben
 
-
+                    // bouw de routes op
                     for (int t = 0; t < 2; t++)
                     {
                         for (int dk = 0; dk < 5;  dk++)
@@ -153,6 +154,28 @@ namespace GroteOpdracht
                     foreach (int order in f234Orders)
                     {
                         grabbeltonFreq234.Remove(order);
+                    }
+
+                    // extra controle dat ze allemaal de juiste hoeveelheid routes hebben.
+                    if (oplossing.trucksEnRoutes[0][0].routes.Count == 1)
+                    {
+                        oplossing.trucksEnRoutes[0][0].routes.Add(new Route(oplossing.stort));
+                    }
+                    if (oplossing.trucksEnRoutes[1][0].routes.Count == 1)
+                    {
+                        oplossing.trucksEnRoutes[1][0].routes.Add(new Route(oplossing.stort));
+                    }
+                    if (oplossing.trucksEnRoutes[0][3].routes.Count == 1)
+                    {
+                        oplossing.trucksEnRoutes[0][3].routes.Add(new Route(oplossing.stort));
+                    }
+                    if (oplossing.trucksEnRoutes[0][4].routes.Count == 1)
+                    {
+                        oplossing.trucksEnRoutes[0][4].routes.Add(new Route(oplossing.stort));
+                    }
+                    if (oplossing.trucksEnRoutes[1][4].routes.Count == 1)
+                    {
+                        oplossing.trucksEnRoutes[1][4].routes.Add(new Route(oplossing.stort));
                     }
                 }
             }
@@ -217,7 +240,7 @@ namespace GroteOpdracht
                 else if (save == "4")
                 {
                     oplossing.tellertje = 0;
-                    oplossing.T = 2;
+                    oplossing.T = oplossing.old_T;
                 }
                 // gebruik de tot nu toe beste oplossing opnieuw
                 else if (save == "5")
@@ -246,18 +269,21 @@ namespace GroteOpdracht
         public double score;
         public long plateauCount;
         public double increment;
-        public long iterations = 1000000000; // 4 miljard duurt ~16 minuten
-        public double T = 1;
-        public long Q = 10000000;
+        //public long iterations = 4000000000; // 4 miljard duurt ~16 minuten
+        public long iterations = 1000000; // 4 miljard duurt ~16 minuten
+        public double old_T;
+        public double T = 0.1;
+        public long Q = 50000000;
         public double alpha;
         public Random rnd;
         public Oplossing(double[,] dictInput, Random rndIn)
         {
 
             stort = ["0", "-", "0", "0", "0", "0", "287"];
-            trucksEnRoutes = [[new Dag(stort, 2), new Dag(stort), new Dag(stort), new Dag(stort, 2), new Dag(stort)], [new Dag(stort, 2), new Dag(stort), new Dag(stort), new Dag(stort, 2), new Dag(stort)]];
+            trucksEnRoutes = [[new Dag(stort, 2), new Dag(stort), new Dag(stort), new Dag(stort, 2), new Dag(stort, 2)], [new Dag(stort, 2), new Dag(stort), new Dag(stort), new Dag(stort), new Dag(stort, 2)]];
             distDict = dictInput;
             alpha = 0.99F;
+            old_T = T;
             rnd = rndIn;
             plateauCount = 0;
             List<string> first = makeString(trucksEnRoutes);
@@ -342,45 +368,45 @@ namespace GroteOpdracht
             while (tellertje < iterations && T > 0.00005F)
             {
                 double oldscore = score;
-                int op = rnd.Next(100);
+                int op = rnd.Next(101);
 
-                if (plateauCount > 1000)
+                // misschien todo: laat alle kansen afhangen van het aantal iteraties
+                if (op < 3) { removeStop(); }
+                else if (op < 8) { addMultiple(); }
+                else if (op < 13) { addOperation(); }
+                else if (op < 75) { shiftBetween(); }
+                else if (op < 100) { shiftWithin(); }
+                else if (op < 101) { removeMultiple(); }
+
+
+                if (oldscore == score) { plateauCount++; } else { plateauCount = 0; }
+                if (score < beste.Item1) { beste = (score, makeString(trucksEnRoutes)); }
+
+                tellertje++;
+
+                if (tellertje % Q == 0)
+                {
+                    T = T * alpha;
+                }
+
+                if (plateauCount > 5000)
                 {
                     // voer een random walk uit voor 100 iteraties dmv een verhoogde T waarde
                     double old_T = T;
-                    T = T * 1.1;
+                    T = T * 0.01;
                     for (int rw = 0; rw < 100; rw++)
                     {
-                        op = rnd.Next(100);
+                        op = rnd.Next(101);
                         if (op < 3) { removeStop(); }
                         else if (op < 8) { addMultiple(); }
                         else if (op < 13) { addOperation(); }
                         else if (op < 75) { shiftBetween(); }
                         else if (op < 100) { shiftWithin(); }
+                        else if (op < 101) { removeMultiple(); }
                         tellertje++;
                     }
                     plateauCount = 0;
                     T = old_T;
-                }
-                else
-                {
-                    // misschien todo: laat alle kansen afhangen van het aantal iteraties
-                    if (op < 3) { removeStop(); }
-                    else if (op < 8) { addMultiple(); }
-                    else if (op < 13) { addOperation(); }
-                    else if (op < 75) { shiftBetween(); }
-                    else if (op < 100) { shiftWithin(); }
-
-
-                    if (oldscore == score) { plateauCount++; } else { plateauCount = 0; }
-                    if (score < beste.Item1) { beste = (score, makeString(trucksEnRoutes)); }
-
-                    tellertje++;
-
-                    if (tellertje % Q == 0)
-                    {
-                        T = T * alpha;
-                    }
                 }
             }
         }
@@ -418,55 +444,30 @@ namespace GroteOpdracht
                     if (r.route.Count == 3)
                     {
                         // verwijder ook de route uit de dag als er maar 1 stop is
-                        tijdDelta = - rijtijd(b, b.predecessor) - rijtijd(b.successor, b) - 30 - b.ldm;
-                        increment = b.ldm * 3 + tijdDelta;
+                        tijdDelta += - 30;
+                    }
+
+                    tijdDelta += rijtijd(b.successor, b.predecessor) - rijtijd(b, b.predecessor) - rijtijd(b.successor, b) - b.ldm;
+                    double capDelta = -b.cont * b.vpc;
+                    increment = tijdDelta + 3 * b.ldm;
+
+                    if (acceptIncrement())
+                    {
+                        d.tijdsduur += tijdDelta;
+                        r.capaciteit += capDelta;
 
                         Bedrijf pred = b.predecessor;
                         Bedrijf succ = b.successor;
 
-                        if (acceptIncrement())
-                        {
-                            grabbelton.Add(b);
+                        pred.ReplaceChains(pred.predecessor, succ);
+                        succ.ReplaceChains(pred, succ.successor);
 
-                            if (d.routes.Count == 1)
-                            {
-                                r.route.Remove(b);
-                                pred.ReplaceChains(null, succ);
-                                succ.ReplaceChains(pred, null);
-                                r.capaciteit = 0;
-                            }
-                            else
-                            {
-                                d.routes.Remove(r);
-                            }
+                        r.route.Remove(b);
+                        grabbelton.Add(b);
 
-                            d.tijdsduur += tijdDelta;
-                            score += increment;
-                        }
+                        score += increment;
                     }
-                    else
-                    {
-                        tijdDelta = rijtijd(b.successor, b.predecessor) - rijtijd(b, b.predecessor) - rijtijd(b.successor, b) - b.ldm;
-                        double capDelta = -b.cont * b.vpc;
-                        increment = tijdDelta + 3 * b.ldm;
-
-                        if (acceptIncrement())
-                        {
-                            d.tijdsduur += tijdDelta;
-                            r.capaciteit += capDelta;
-
-                            Bedrijf pred = b.predecessor;
-                            Bedrijf succ = b.successor;
-
-                            pred.ReplaceChains(pred.predecessor, succ);
-                            succ.ReplaceChains(pred, succ.successor);
-
-                            r.route.Remove(b);
-                            grabbelton.Add(b);
-
-                            score += increment;
-                        }
-                    }
+                    
                 }
             }
         }
@@ -741,7 +742,84 @@ namespace GroteOpdracht
 
             }
         }
-        
+        void removeMultiple()
+        {
+            int dagkey = rnd.Next(0, 5);
+            int truckkey = rnd.Next(0, 2);
+
+            Dag d = trucksEnRoutes[truckkey][dagkey];
+            Route r = d.routes[rnd.Next(d.routes.Count)];
+            Bedrijf b = r.route[rnd.Next(r.route.Count)];
+            if (b.freq > 1)
+            {
+                List<Bedrijf> clones = new List<Bedrijf>();
+                List<Route> routes = new List<Route>();
+                List<int> dagindexen = new List<int>();
+                List<int> truckindexen = new List<int>();
+
+                for (int t = 0; t < 2; t++)
+                {
+                    for (int dk = 0; dk < 5; dk++)
+                    {
+                        foreach (Route dr in trucksEnRoutes[t][dk].routes)
+                        {
+                            foreach (Bedrijf bd in dr.route)
+                            {
+                                if (bd.order == b.order) 
+                                { 
+                                    clones.Add(bd);
+                                    truckindexen.Add(t);
+                                    dagindexen.Add(dk);
+                                    routes.Add(dr);
+                                }
+                            }
+                        }
+                    }
+                }
+
+                List<double> tijdDeltas = new List<double>();
+                List<double> capDeltas = new List<double>();
+                for (int i = 0; i < clones.Count; i++)
+                {
+                    Bedrijf clone = clones[i];
+                    double tijdDelta;
+                    tijdDelta = rijtijd(clone.successor, clone.predecessor) - rijtijd(clone, clone.predecessor) - rijtijd(clone.successor, clone) - b.ldm;
+                    if (routes[i].route.Count == 3)
+                    {
+                        tijdDelta += -30;
+                    }
+                    double capDelta = -b.vpc * b.cont;
+                    tijdDeltas.Add(tijdDelta);
+                    capDeltas.Add(capDelta);
+                }
+                increment = b.ldm * 3 * b.freq + tijdDeltas.Sum();
+
+                if (acceptIncrement())
+                {
+                    for (int i = 0; i < clones.Count; i++)
+                    {
+                        Dag dclone = trucksEnRoutes[truckindexen[i]][dagindexen[i]];
+                        dclone.tijdsduur += tijdDeltas[i];
+
+                        Route rclone = routes[i];
+                        rclone.capaciteit += capDeltas[i];
+
+                        Bedrijf bclone = clones[i];
+                        Bedrijf pred = bclone.predecessor;
+                        Bedrijf succ = bclone.successor;
+
+                        pred.ReplaceChains(pred.predecessor, succ);
+                        succ.ReplaceChains(pred, succ.successor);
+
+                        rclone.route.Remove(bclone);
+                    }
+
+                    score += increment;
+                    grabbeltonFreq234.Add(b);
+                }
+            }
+        }
+
         double rijtijd(Bedrijf b, Bedrijf pred)
         {
             return distDict[pred.matrixID, b.matrixID];
