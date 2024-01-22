@@ -276,6 +276,7 @@ namespace GroteOpdracht
         public long Q = 50000000;
         public double alpha;
         public Random rnd;
+        public Mutex mut = new Mutex();
         public Oplossing(double[,] dictInput, Random rndIn)
         {
 
@@ -410,6 +411,64 @@ namespace GroteOpdracht
                 }
             }
         }
+        // Threading
+        void ThreadProc()
+        {
+            double oldscore = score;
+            int op = rnd.Next(101);
+
+            // misschien todo: laat alle kansen afhangen van het aantal iteraties
+            if (op < 3) { removeStop(); }
+            else if (op < 8) { addMultiple(); }
+            else if (op < 13) { addOperation(); }
+            else if (op < 75) { shiftBetween(); }
+            else if (op < 100) { shiftWithin(); }
+            else if (op < 101) { removeMultiple(); }
+
+
+            if (oldscore == score) { plateauCount++; } else { plateauCount = 0; }
+
+            // this is the sensitive part. use mutex
+
+            if (score < beste.Item1)
+            {
+                changeBest(score, trucksEnRoutes);
+                beste = (score, makeString(trucksEnRoutes)); 
+            }
+
+            tellertje++;
+
+            if (tellertje % Q == 0)
+            {
+                T = T * alpha;
+            }
+
+            if (plateauCount > 5000)
+            {
+                // voer een random walk uit voor 100 iteraties dmv een verhoogde T waarde
+                double old_T = T;
+                T = T * 0.01;
+                for (int rw = 0; rw < 100; rw++)
+                {
+                    op = rnd.Next(101);
+                    if (op < 3) { removeStop(); }
+                    else if (op < 8) { addMultiple(); }
+                    else if (op < 13) { addOperation(); }
+                    else if (op < 75) { shiftBetween(); }
+                    else if (op < 100) { shiftWithin(); }
+                    else if (op < 101) { removeMultiple(); }
+                    tellertje++;
+                }
+                plateauCount = 0;
+                T = old_T;
+            }
+        }
+        // use mutex to change the best score found up till now
+        void changeBest(double th_score, Dag[][] tandr)
+        {
+
+        }
+
         // kijkt of de huidige increment geaccepteerd word in de operation, op basis van simulated annealing
         bool acceptIncrement()
         {
