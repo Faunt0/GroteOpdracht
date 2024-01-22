@@ -270,10 +270,10 @@ namespace GroteOpdracht
         public long plateauCount;
         public double increment;
         //public long iterations = 4000000000; // 4 miljard duurt ~16 minuten
-        public long iterations = 1000000; // 4 miljard duurt ~16 minuten
+        public long iterations = 5; // 4 miljard duurt ~16 minuten
         public double old_T;
-        public double T = 0.1;
-        public long Q = 50000000;
+        public double T = 1;
+        public long Q = 1000000;
         public double alpha;
         public Random rnd;
         public Mutex mut = new Mutex();
@@ -329,7 +329,6 @@ namespace GroteOpdracht
         }
         public double recurseRoute(Bedrijf b)
         {
-            bool dkjfkdjf = checkCycle(b, []);
             if (b.successor == null)
             {
                 return 0;
@@ -390,12 +389,12 @@ namespace GroteOpdracht
                     T = T * alpha;
                 }
 
-                if (plateauCount > 5000)
+                if (plateauCount > 10000)
                 {
                     // voer een random walk uit voor 100 iteraties dmv een verhoogde T waarde
                     double old_T = T;
-                    T = T * 0.01;
-                    for (int rw = 0; rw < 100; rw++)
+                    T = T * 2;
+                    for (int rw = 0; rw < rnd.Next(100); rw++)
                     {
                         op = rnd.Next(101);
                         if (op < 3) { removeStop(); }
@@ -411,7 +410,7 @@ namespace GroteOpdracht
                 }
             }
         }
-        // Threading
+        // Threading // laat maar
         void ThreadProc()
         {
             double oldscore = score;
@@ -928,7 +927,6 @@ namespace GroteOpdracht
                 succ.ReplaceChains(b, succ.successor);
                 b.ReplaceChains(pred, succ);
             }
-            //bool xdafsfs = checkCycle(route[0], new List<int>());
         }
         // dit is een recursieve functie bedoelt om de route uit te lezen en er een lijst van strings van te maken die te gebruiken valt in de checker
         public List<string> makeString(Bedrijf b, int place)
@@ -940,16 +938,6 @@ namespace GroteOpdracht
             if (b.predecessor == null) { return res; }
             res.Add($"{place}; {b.order}");
             return res;
-        }
-        public bool checkCycle(Bedrijf b, List<int> visited)
-        {
-            if (b.successor == null) { return false; }
-            if (visited.Contains(b.matrixID) && b.matrixID != 287) 
-            {
-                throw new Exception("There has been found a cycle!");
-            }
-            visited.Add(b.matrixID);
-            return checkCycle(b.successor, visited);
         }
     }
     public class Bedrijf
