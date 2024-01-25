@@ -12,7 +12,7 @@ namespace GroteOpdracht
     {
         static void Main()
         {
-            // grabbelton:
+            // grabbelton en grabbelton voor frequentie > 1
             Dictionary<int, Bedrijf> grabbelton = new Dictionary<int, Bedrijf>();
             Dictionary<int, Bedrijf> grabbeltonFreq234 = new Dictionary<int, Bedrijf>();
             using (var reader = new StreamReader("../../../orderbestand.txt"))
@@ -30,8 +30,8 @@ namespace GroteOpdracht
                 }
             }
 
-
-            double[,] fileDict = new double[1099,1099]; // maak lijst van
+            // lees de afstanden matrix in
+            double[,] fileDict = new double[1099,1099];
             using (var reader = new StreamReader("../../../afstandenmatrix.txt"))
             {
                 string firstline = reader.ReadLine();
@@ -41,23 +41,21 @@ namespace GroteOpdracht
                     string[] parts = line.Split(";");
                     int id1 = int.Parse(parts[0]);
                     int id2 = int.Parse(parts[1]);
-                    double tijd = double.Parse(parts[3]) / 60D; // is in seconden maar de rest niet
+                    double tijd = double.Parse(parts[3]) / 60D; // is in het bestand in seconden
                     fileDict[id1, id2] = tijd;
                 }
             }
 
             Random rndin = new Random();
-            //Console.WriteLine(rndin.ToString());
             Oplossing oplossing = new Oplossing(fileDict, rndin);
 
             Console.WriteLine("Start from empty [y/n]: ");
             string ans = Console.ReadLine();
-            //string ans = "y";
             if (ans == "n")
             {
                 Oplossing op = new Oplossing(fileDict, rndin);
 
-                // Get the info from the file
+                // lees de informatie van de directory waar we files opslaan
                 Console.WriteLine("Which file:");
                 string filepath = "./oplossingen/";
                 DirectoryInfo d = new DirectoryInfo(filepath);
@@ -65,158 +63,133 @@ namespace GroteOpdracht
                 int index = 0;
                 foreach (var file in d.GetFiles("*.txt"))
                 {
-                    // print the possible files in the folder
+                    // print de namen van alle files
                     Console.WriteLine($"\t{index}.\t{file.Name}");
                     index++;
                     files.Add(file.FullName);
                 }
 
 
-
-                // read the file that has been chosen
+                // lees de regels van de gekozen file
                 string fileI = Console.ReadLine();
+                List<string> inputs = new List<string>();
                 using (var reader = new StreamReader(files[int.Parse(fileI)]))
                 {
-                    // maak de routes
-                    List<(int, int)>[,] t_and_d = new List<(int, int)>[2, 5];
-                    for (int t = 0; t < 2; t++)
-                    {
-                        for (int dk = 0; dk < 5; dk++)
-                        {
-                            t_and_d[t, dk] = new List<(int, int)>();
-                        }
-                    }
-
-                            List<Bedrijf> bedrijven = new List<Bedrijf>();
-                    List<int> f234Orders = new List<int>();
-
                     string line;
                     while ((line = reader.ReadLine()) != null)
                     {
-                        string[] parts = line.Replace(" ", "").Split(";");
-                        Dag dag = oplossing.trucksEnRoutes[int.Parse(parts[0]) - 1][int.Parse(parts[1]) - 1];
-
-                        // save a tuple of the order sequence number and order number
-                        t_and_d[int.Parse(parts[0]) - 1, int.Parse(parts[1]) - 1].Add((int.Parse(parts[2]), int.Parse(parts[3])));
-                    }
-                    // na elke regel gelezen te hebben
-
-                    // bouw de routes op
-                    for (int t = 0; t < 2; t++)
-                    {
-                        for (int dk = 0; dk < 5;  dk++)
-                        {
-                            Dag dag = oplossing.trucksEnRoutes[t][dk];
-                            dag.routes.Clear();
-
-                            Dictionary<int, int> kv = t_and_d[t, dk].ToDictionary(x => x.Item1, x => x.Item2);
-
-                            int r_index = 0;
-                            Route r = new Route(oplossing.stort);
-                            dag.routes.Add(r);
-                            for (int i = 1; i < kv.Count + 1; i++)
-                            {
-                                if (kv[i] == 0)
-                                {
-                                    // maak een nieuwe route aan
-                                    dag.routes[r_index].maakLinkedList();
-                                    if (i != kv.Count)
-                                    {
-                                        dag.routes.Add(new Route(oplossing.stort));
-                                        r_index++;
-                                    }
-                                }
-                                else if (i != kv.Count)
-                                {
-                                    Bedrijf b = grabbelton.ContainsKey(kv[i]) ? grabbelton[kv[i]] : grabbeltonFreq234[kv[i]];
-                                    if (b.freq == 1)
-                                    {
-                                        grabbelton.Remove(b.order); // dit kan niet voor dingen die vaker voor moeten komen. maar wat doe je dan
-                                        dag.routes[r_index].route.Add(b);
-                                    }
-                                    else
-                                    {
-                                        // maak de bedrijven met freq>1 uniek in de route zodat ze unieke pred en succ hebben.
-                                        Bedrijf b_clone = new Bedrijf(b.inputArray);
-                                        b_clone.dagkey = dk;
-                                        dag.routes[r_index].route.Add(b_clone);
-                                        f234Orders.Add(b.order);
-                                    }
-
-                                    dag.routes[r_index].capaciteit += b.cont * b.vpc;
-                                }
-                            }
-                        }
-                    }
-
-                    // verwijder bedrijven met freq > 1 uit de bijbehorende grabbelton
-                    foreach (int order in f234Orders)
-                    {
-                        grabbeltonFreq234.Remove(order);
-                    }
-
-                    // extra controle dat ze allemaal de juiste hoeveelheid routes hebben.
-                    if (oplossing.trucksEnRoutes[0][0].routes.Count == 1)
-                    {
-                        oplossing.trucksEnRoutes[0][0].routes.Add(new Route(oplossing.stort));
-                    }
-                    if (oplossing.trucksEnRoutes[1][0].routes.Count == 1)
-                    {
-                        oplossing.trucksEnRoutes[1][0].routes.Add(new Route(oplossing.stort));
-                    }
-                    if (oplossing.trucksEnRoutes[0][3].routes.Count == 1)
-                    {
-                        oplossing.trucksEnRoutes[0][3].routes.Add(new Route(oplossing.stort));
-                    }
-                    if (oplossing.trucksEnRoutes[0][4].routes.Count == 1)
-                    {
-                        oplossing.trucksEnRoutes[0][4].routes.Add(new Route(oplossing.stort));
-                    }
-                    if (oplossing.trucksEnRoutes[1][4].routes.Count == 1)
-                    {
-                        oplossing.trucksEnRoutes[1][4].routes.Add(new Route(oplossing.stort));
+                        inputs.Add(line);
                     }
                 }
+
+                // bouw de oplossing op in onze data structuur
+                oplossing.SlnfromString(inputs, grabbelton, grabbeltonFreq234);
             }
 
 
+            // maak er lijsten van voor makkelijk willekeurig indexen
             oplossing.grabbelton = grabbelton.Values.ToList();
             oplossing.grabbeltonFreq234 = grabbeltonFreq234.Values.ToList();
-            int timesloped = 0;
             string save = "-";
             while (save == "-" || save == "4" || save == "5")
             {
-                timesloped++;
                 oplossing.beginScore();
+                Console.Clear();
+                double scoreEerst = oplossing.score;
+                Console.WriteLine($"score eerst: {scoreEerst}");
+
+                // mogelijkheid om parameters te veranderen
+                bool changing = true;
+                while (changing)
+                {
+                    // geef een lijst van de huidige parameters
+                    double duration = (oplossing.iterations / (double)4000000) / 60; // 4 miljoen is ongeveer ons gemiddelde
+                    Console.WriteLine($"Est. duration: {duration} minutes");
+                    Console.WriteLine("Do you want to change parameters?");
+                    Console.WriteLine($"\t1. Num. Iterations:\t\t{oplossing.iterations}");
+                    Console.WriteLine($"\t2.T (start):t\t{oplossing.T}");
+                    Console.WriteLine($"\t3.Q:\t\t{oplossing.Q}");
+                    Console.WriteLine($"\t4.Plateau boundary:\t\t{oplossing.plt_bound}");
+                    Console.WriteLine("\tPress Enter to continue");
+
+                    string c = Console.ReadLine();
+                    if (c == "1")
+                    {
+                        Console.WriteLine("New Value for max iterations: ");
+                        long i = long.Parse(Console.ReadLine());
+                        oplossing.iterations = i;
+                    }
+                    else if (c == "2")
+                    {
+                        Console.WriteLine("New value for T (start) (use ','): ");
+                        double i = double.Parse(Console.ReadLine());
+                        oplossing.T = i;
+                    }
+                    else if (c == "3")
+                    {
+                        Console.WriteLine("New value for Q: ");
+                        long i = long.Parse(Console.ReadLine());
+                        oplossing.Q = i;
+                    }
+                    else if (c == "4")
+                    {
+                        Console.WriteLine("New value for plateau boundary: ");
+                        long i = long.Parse(Console.ReadLine());
+                        oplossing.plt_bound = i;
+                    }
+                    else { changing = false; }
+                }
+                Console.Clear();
                 Console.WriteLine($"score eerst: {oplossing.score}");
+                Console.WriteLine("|--------------------|");
+                Console.Write(" ");
+
                 DateTime before = DateTime.Now;
-                oplossing.ILS();
+                oplossing.LocalSearch();
                 DateTime after = DateTime.Now;
                 TimeSpan ts = after - before;
-
-                Console.WriteLine($"incrementele score daarna: {oplossing.score}");
-                oplossing.beginScore();
-                Console.WriteLine($"berekende score daarna: {oplossing.score}");
-                Console.WriteLine($"beste score?: {oplossing.beste.Item1}");
-                Console.WriteLine($"Milliseconden:\t{ts.TotalMilliseconds}");
+                Console.Clear();
+                Console.WriteLine($"Score eerst:\t{scoreEerst}");
+                Console.WriteLine($"Laatste score:\t{oplossing.score}");
+                Console.WriteLine($"Beste score:\t{oplossing.beste.Item1}");
+                Console.WriteLine($"Duration:\t{ts}");
                 Console.WriteLine($"Iteraties:\t{oplossing.tellertje}");
+
                 double speed = oplossing.tellertje / ((double)ts.TotalMilliseconds / 1000);
                 Console.WriteLine($"speed:\t\t{speed} iterations/s");
                 Console.WriteLine($"T waarde:\t{oplossing.T}");
                 Console.WriteLine($"plateau count:\t{oplossing.plateauCount}");
+
+                // opties voor vervolg acties
                 Console.WriteLine("Kies een oplossing actie:");
-                Console.WriteLine($"\t0.\tBeste Oplossing:\tScore = {oplossing.beste.Item1}");
-                Console.WriteLine($"\t1.\tLaatste Oplossing:\tScore = {oplossing.score}");
+                Console.WriteLine($"\t0.\tBeste Oplossing:\t\tScore = {oplossing.beste.Item1}");
+                Console.WriteLine($"\t1.\tLaatste Oplossing:\t\tScore = {oplossing.score}");
                 Console.WriteLine($"\t2.\tBeide Oplossingen");
                 Console.WriteLine($"\t3.\tGeen van beide");
                 Console.WriteLine($"\t4.\tDoe nogmaals hetzelfde aantal iteraties met de laatste oplossing");
                 Console.WriteLine($"\t5.\tDoe nogmaals hetzelfde aantal iteraties met de beste oplossing");
+
+
+                // geef de mogelijkheid om bestanden op te slaan of om meer iteraties te doen
                 save = Console.ReadLine().Trim();
-                if (save == "1") // alleen de laatste oplossing saven
+                if (save == "0") // alleen de beste oplossing saven
+                {
+                    Console.WriteLine("Name the save file [Enter for default]:\t");
+                    string fileName = Console.ReadLine();
+                    fileName = fileName == "" ? Math.Round(oplossing.beste.Item1).ToString() + " " + after.ToShortTimeString() : fileName;
+                    StreamWriter sw = new StreamWriter($"./oplossingen/{fileName}.txt");
+                    foreach (string line in oplossing.beste.Item2)
+                    {
+                        sw.WriteLine(line);
+                    }
+                    sw.Close();
+                }
+                else if (save == "1") // alleen de laatste oplossing saven
                 {
                     List<string> lines = oplossing.makeString(oplossing.trucksEnRoutes);
-                    Console.WriteLine("Name the save file:\t");
+                    Console.WriteLine("Name the save file [Enter for default]:\t");
                     string fileName = Console.ReadLine();
+                    fileName = fileName == "" ? Math.Round(oplossing.score).ToString() + " " + after.ToShortTimeString() : fileName;
                     StreamWriter sw = new StreamWriter($"./oplossingen/{fileName}.txt");
                     foreach (string line in lines)
                     {
@@ -224,11 +197,25 @@ namespace GroteOpdracht
                     }
                     sw.Close();
                 }
-                else if (save == "0") // alleen de beste oplossing saven
+                else if (save == "2") // beide oplossingen saven
                 {
-                    Console.WriteLine("Name the save file:\t");
+                    // laatste oplossing saven
+                    List<string> lines = oplossing.makeString(oplossing.trucksEnRoutes);
+                    Console.WriteLine("Name the save file for the last solution [Enter for default]:\t");
                     string fileName = Console.ReadLine();
+                    fileName = fileName == "" ? Math.Round(oplossing.score).ToString() + " " + after.ToShortTimeString() : fileName;
                     StreamWriter sw = new StreamWriter($"./oplossingen/{fileName}.txt");
+                    foreach (string line in lines)
+                    {
+                        sw.WriteLine(line);
+                    }
+                    sw.Close();
+
+                    // beste oplossing
+                    Console.WriteLine("Name the save file for the best solution [Enter for default]:\t");
+                    fileName = Console.ReadLine();
+                    fileName = fileName == "" ? Math.Round(oplossing.beste.Item1).ToString() + " " + after.ToShortTimeString() : fileName;
+                    sw = new StreamWriter($"./oplossingen/{fileName}.txt");
                     foreach (string line in oplossing.beste.Item2)
                     {
                         sw.WriteLine(line);
@@ -244,10 +231,26 @@ namespace GroteOpdracht
                 // gebruik de tot nu toe beste oplossing opnieuw
                 else if (save == "5")
                 {
-                    throw new Exception("This does not work properly, seeing as the best solution is in text format and the way to convert this into a usable format has yet to be properly implemented");
-                    //oplossing.trucksEnRoutes = oplossing.beste.Item2;
-                    //oplossing.tellertje = 0;
-                    //oplossing.T = 30;
+                    grabbelton = new Dictionary<int, Bedrijf>();
+                    grabbeltonFreq234 = new Dictionary<int, Bedrijf>();
+                    using (var reader = new StreamReader("../../../orderbestand.txt"))
+                    {
+                        string firstline = reader.ReadLine();
+
+                        string line;
+                        while ((line = reader.ReadLine()) != null)
+                        {
+
+                            string[] parts = line.Split(';');
+                            Bedrijf bv = new Bedrijf(parts);
+                            if (bv.freq == 1) { grabbelton[bv.order] = bv; }
+                            else { grabbeltonFreq234[bv.order] = bv; } // bewaar alle bedrijven met een frequentie > 1 in een aparte grabbelton
+                        }
+                    }
+
+                    oplossing.SlnfromString(oplossing.beste.Item2, grabbelton, grabbeltonFreq234);
+                    oplossing.score = oplossing.beste.Item1;
+                    oplossing.tellertje = 0;
                 }
                 else
                 {
