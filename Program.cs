@@ -174,9 +174,8 @@ namespace GroteOpdracht
                 save = Console.ReadLine().Trim();
                 if (save == "0") // alleen de beste oplossing saven
                 {
-                    Console.WriteLine("Name the save file [Enter for default]:\t");
+                    Console.WriteLine("Name the save file:\t");
                     string fileName = Console.ReadLine();
-                    fileName = fileName == "" ? Math.Round(oplossing.beste.Item1).ToString() + " " + after.ToShortTimeString() : fileName;
                     StreamWriter sw = new StreamWriter($"./oplossingen/{fileName}.txt");
                     foreach (string line in oplossing.beste.Item2)
                     {
@@ -187,9 +186,8 @@ namespace GroteOpdracht
                 else if (save == "1") // alleen de laatste oplossing saven
                 {
                     List<string> lines = oplossing.makeString(oplossing.trucksEnRoutes);
-                    Console.WriteLine("Name the save file [Enter for default]:\t");
+                    Console.WriteLine("Name the save file:\t");
                     string fileName = Console.ReadLine();
-                    fileName = fileName == "" ? Math.Round(oplossing.score).ToString() + " " + after.ToShortTimeString() : fileName;
                     StreamWriter sw = new StreamWriter($"./oplossingen/{fileName}.txt");
                     foreach (string line in lines)
                     {
@@ -201,9 +199,8 @@ namespace GroteOpdracht
                 {
                     // laatste oplossing saven
                     List<string> lines = oplossing.makeString(oplossing.trucksEnRoutes);
-                    Console.WriteLine("Name the save file for the last solution [Enter for default]:\t");
+                    Console.WriteLine("Name the save file for the last solution:\t");
                     string fileName = Console.ReadLine();
-                    fileName = fileName == "" ? Math.Round(oplossing.score).ToString() + " " + after.ToShortTimeString() : fileName;
                     StreamWriter sw = new StreamWriter($"./oplossingen/{fileName}.txt");
                     foreach (string line in lines)
                     {
@@ -212,9 +209,8 @@ namespace GroteOpdracht
                     sw.Close();
 
                     // beste oplossing
-                    Console.WriteLine("Name the save file for the best solution [Enter for default]:\t");
+                    Console.WriteLine("Name the save file for the best solution:\t");
                     fileName = Console.ReadLine();
-                    fileName = fileName == "" ? Math.Round(oplossing.beste.Item1).ToString() + " " + after.ToShortTimeString() : fileName;
                     sw = new StreamWriter($"./oplossingen/{fileName}.txt");
                     foreach (string line in oplossing.beste.Item2)
                     {
